@@ -1,9 +1,11 @@
 const KINDS: Array<[RegExp, string]> = [
+  [/claude[\s_-]*code/i, 'claude-code'],
   [/claude/i, 'claude'],
   [/cursor/i, 'cursor'],
   [/gemini/i, 'gemini'],
   [/antigravity/i, 'antigravity'],
   [/codex|openai|chatgpt/i, 'codex'],
+  [/kimi|moonshot/i, 'kimi'],
   [/copilot/i, 'copilot'],
   [/windsurf/i, 'windsurf'],
   [/^(human|you|user|dev|developer)$/i, 'human'],
@@ -22,7 +24,20 @@ export function normalizeAgent(raw: string | undefined | null): string {
   return slug || 'agent';
 }
 
+const PRETTY: Record<string, string> = {
+  claude: 'Claude',
+  'claude-code': 'Claude Code',
+  cursor: 'Cursor',
+  gemini: 'Gemini CLI',
+  antigravity: 'Antigravity',
+  codex: 'Codex',
+  copilot: 'Copilot',
+  kimi: 'Kimi',
+  windsurf: 'Windsurf',
+  human: '[Human]',
+};
+
 export function describeAgent(name: string): { display: string; kind: string } {
   const hit = KINDS.find(([, k]) => k === name);
-  return { display: name === 'human' ? '[Human]' : name, kind: hit ? hit[1] : 'other' };
+  return { display: PRETTY[name] ?? name, kind: hit ? hit[1] : 'other' };
 }

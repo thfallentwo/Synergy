@@ -40,6 +40,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "better-sqlite3": "^13.2.0",
+    "diff": "^9.0.0",
     "open": "^11.0.4",
     "zod": "^4.6.7"
   },

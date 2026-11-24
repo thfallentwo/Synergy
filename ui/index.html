@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="synergy-token" content="__SYNERGY_TOKEN__">
+<title>Synergy</title>
+<style>
+:root{--bg:#0d1016;--panel:#10141c;--line:#222836;--ink:#e6e9ef;--mut:#8b93a5;--acc:#7c9cff;--add:#aff5b4;--del:#ffb3ae}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.m,.code{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+#app{height:100%;display:flex;flex-direction:column;min-height:560px}
+header{height:52px;flex:none;display:flex;align-items:center;gap:16px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+header strong{font-size:16px}
+.mut{color:var(--mut)}
+.sp{flex:1}
+.live{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:#566074}
+.dot.working{background:#3fb950}.dot.idle{background:#d4a72c}.dot.offline{background:#566074}
+select,input,button{font:inherit;color:var(--ink)}
+select,.btn{background:#1e2533;border:1px solid #2b3345;border-radius:6px;padding:6px 10px;min-height:32px;cursor:pointer;font-size:12px;font-weight:500}
+.btn:hover,select:hover{background:#252d3f}
+.btn:focus-visible,select:focus-visible,input:focus-visible,.tab:focus-visible,.leaf:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.cols{flex:1;display:flex;min-height:0}
+aside{flex:none;background:var(--panel);overflow:auto}
+#left{width:250px;border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:24px}
+#right{width:320px;border-left:1px solid var(--line);padding:16px 14px;display:flex;flex-direction:column;gap:12px}
+h2{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:600}
+.leaf{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:13px;color:#c5cad6;cursor:default;min-height:28px}
+button.leaf{width:100%;background:none;border:0;text-align:left;cursor:pointer}
+.leaf:hover{background:#171d29}.leaf.on{background:#1e2533;color:#fff}
+.leaf .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.leaf .tag{margin-left:auto;font-size:10px;white-space:nowrap}
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+.tabs{display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--line);gap:0}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:12px 14px;color:var(--mut);font-size:13px;font-weight:500;cursor:pointer}
+.tab.on{color:#fff;border-bottom-color:var(--acc)}
+.tabs .btn{margin-left:8px}
+.pane{flex:1.1;min-height:0;overflow:auto;border-bottom:1px solid var(--line);padding:14px 0}
+main[data-tab=chat] .pane{display:none}
+main:not([data-tab=code]) #pane-code{display:none}
+main:not([data-tab=control]) #pane-control{display:none}
+#diffhead{padding:0 20px 10px;font-size:12px;color:var(--mut);display:flex;gap:10px;flex-wrap:wrap}
+.ln{display:flex;font-size:13px;line-height:22px;white-space:pre;color:#aab2c3}
+.ln i{width:46px;flex:none;text-align:right;padding-right:10px;color:#566074;font-style:normal}
+.ln b{width:16px;flex:none;font-weight:400}
+.ln.a{background:rgba(63,185,80,.14);color:var(--add)}.ln.d{background:rgba(248,81,73,.14);color:var(--del)}
+.ln.h{color:#7aa2ff;background:#141b2b}
+.dh{padding:10px 20px 4px;font-size:12px;color:var(--mut)}
+.ctl{padding:0 20px;display:flex;flex-direction:column;gap:16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+#chatwrap{flex:1;min-height:0;display:flex;flex-direction:column}
+#chat{flex:1;min-height:0;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.bub{max-width:72%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--bg2,#1d2230);border:1px solid var(--bd,#3a4258);align-self:flex-start;overflow-wrap:anywhere}
+.bub.me{align-self:flex-end}
+.bub .who{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--ac,#c5cad6);margin-bottom:3px}
+.bub .who img,.bub .who .mono{width:16px;height:16px}
+.bub .who .t{margin-left:auto;padding-left:12px;font-weight:400;color:var(--mut)}
+.chip{font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.1);margin-right:6px}
+.alert{align-self:center;font-size:11px;color:var(--mut);background:#171c27;border-radius:99px;padding:4px 12px;max-width:90%;overflow-wrap:anywhere;text-align:center}
+#send{display:flex;gap:10px;padding:12px 20px;border-top:1px solid var(--line)}
+#send input{flex:1;background:#151a24;border:1px solid #2b3345;border-radius:8px;padding:10px 14px;font-size:13px;min-height:40px}
+#send button{background:var(--acc);color:#0d1016;border-color:var(--acc);font-weight:600;padding:0 18px}
+#err{color:var(--del);font-size:12px;padding:0 20px 6px;min-height:0}
+.card{border-radius:12px;padding:12px;border:1px solid;display:flex;flex-direction:column;gap:8px}
+.card.g{background:#143a26;border-color:#2f8f4e}.card.r{background:#451c22;border-color:#b5424a}.card.n{background:#1a2030;border-color:#323b50}
+.card.off{opacity:.7}
+.card .top{display:flex;align-items:center;gap:12px}
+.card .nm{font-weight:600;font-size:15px;color:var(--ac,#e6e9ef)}
+.card .st{font-size:11px;color:#c5cad6}
+.net{margin-left:auto;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.12);white-space:nowrap}
+.cnts{display:flex;gap:20px}.cnt{font-size:15px;font-weight:600}.cnt.a{color:var(--add)}.cnt.d{color:var(--del)}
+.sum{margin:0;font-size:12.5px;line-height:1.45;color:#d6dbe6;overflow-wrap:anywhere}
+.file{font-size:11px;color:var(--mut);overflow-wrap:anywhere}
+.av{width:44px;height:44px;object-fit:contain;flex:none}
+.mono{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#2b3345;font-weight:700;color:#fff;flex:none}
+.av.mono{font-size:18px}
+.dots span{display:inline-block;animation:bl 1.2s infinite;opacity:.2}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,100%{opacity:.2}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.dots span{animation:none;opacity:.8}}
+.empty{color:var(--mut);font-size:13px;margin:0}
+[data-kind=claude],[data-kind=claude-code]{--ac:#f0a483;--bg2:#3a2418;--bd:#6b4129}
+[data-kind=antigravity]{--ac:#8ec5ff;--bg2:#16233f;--bd:#2c4478}
+[data-kind=gemini]{--ac:#a9c4ff;--bg2:#17233d;--bd:#33497a}
+[data-kind=cursor]{--ac:#d0d4dc;--bg2:#222733;--bd:#3d4559}
+[data-kind=codex]{--ac:#e6e9ef;--bg2:#1f2630;--bd:#3a4553}
+[data-kind=copilot]{--ac:#d9a8ff;--bg2:#2a1f3d;--bd:#58427f}
+[data-kind=kimi]{--ac:#8bbcff;--bg2:#162136;--bd:#2f4a73}
+[data-kind=human]{--ac:#e6e9ef;--bg2:#1d2230;--bd:#3a4258}
+@media (max-width:900px){.cols{flex-direction:column;overflow:auto}#left,#right{width:auto;border:0}main{min-height:600px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="9" cy="13" r="7" fill="none" stroke="#7c9cff" stroke-width="2.5"/><circle cx="17" cy="13" r="7" fill="none" stroke="#e8a06a" stroke-width="2.5"/></svg>
+    <strong>Synergy</strong>
+    <span class="mut" id="proj"></span>
+    <span class="sp"></span>
+    <span class="live" role="status"><span class="dot" id="livedot"></span><span id="livetxt">Connecting…</span></span>
+    <label class="mut" style="font-size:12px" for="lang">Summary language</label>
+    <select id="lang"></select>
+  </header>
+  <div class="cols">
+    <aside id="left">
+      <section><h2>Explorer</h2><div id="tree"></div></section>
+      <section><h2>Connections</h2><div id="conns"></div></section>
+    </aside>
+    <main data-tab="code" id="main">
+      <div class="tabs" role="tablist">
+        <button class="tab on" role="tab" data-tab="code" type="button">Code preview</button>
+        <button class="tab" role="tab" data-tab="chat" type="button">Agent chat</button>
+        <button class="tab" role="tab" data-tab="control" type="button">Control panel</button>
+        <span class="sp"></span>
+        <button class="btn" id="pause" type="button">Pause all</button>
+        <button class="btn" id="forcebtn" type="button">Force unlock</button>
+      </div>
+      <section class="pane" id="pane-code"><div id="diffhead"></div><div id="diff"></div></section>
+      <section class="pane" id="pane-control"><div class="ctl" id="ctl"></div></section>
+      <section id="chatwrap">
+        <div id="chat" aria-live="polite"></div>
+        <div id="err" role="alert"></div>
+        <form id="send" autocomplete="off">
+          <label for="msg" style="position:absolute;left:-9999px">Message to the group</label>
+          <input id="msg" placeholder="Message the group, @agent text, /lock file, /unlock file" maxlength="500">
+          <button class="btn" type="submit">Send</button>
+        </form>
+      </section>
+    </main>
+    <aside id="right"><h2 id="agents-title">Agents</h2><div id="agents" style="display:flex;flex-direction:column;gap:12px"></div></aside>
+  </div>
+</div>
+<script>
+(() => {
+const $ = (s) => document.querySelector(s);
+const TOKEN = $('meta[name=synergy-token]').content;
+const ICONS = new Set(['claude','claude-code','antigravity','codex','gemini','copilot','cursor','kimi']);
+const LANGS = [['en','English'],['tr','Türkçe'],['de','Deutsch'],['es','Español'],['fr','Français'],['pt','Português'],['ru','Русский'],['ja','日本語'],['zh','中文']];
+const S = { agents: [], locks: [], events: [], diffs: [], tree: [], lang: 'en', project: '', selected: null, pinned: false, tab: 'code', follow: true, diffData: null, collapsed: new Set() };
+
+function el(tag, cls, ...kids) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  for (const k of kids) { if (k == null || k === false) continue; e.append(k.nodeType ? k : document.createTextNode(String(k))); }
+  return e;
+}
+const nf = (n) => { try { return Number(n).toLocaleString(S.lang); } catch { return String(n); } };
+const hhmm = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const age = (ts) => { const s = Math.max(0, Math.floor((Date.now() - ts) / 1000)); if (s < 60) return s + 's'; const m = Math.floor(s / 60); if (m < 60) return m + 'm'; const h = Math.floor(m / 60); return h < 24 ? h + 'h' : Math.floor(h / 24) + 'd'; };
+const agentOf = (n) => S.agents.find((a) => a.name === n);
+const kindOf = (n) => (n === 'human' ? 'human' : agentOf(n)?.kind ?? n);
+const nameOf = (n) => (n === 'human' ? '[Human]' : agentOf(n)?.display ?? n);
+
+function avatar(kind, name, cls) {
+  if (ICONS.has(kind)) { const i = el('img', cls); i.src = '/icons/' + kind + '.png'; i.alt = ''; return i; }
+  return el('span', 'mono ' + cls, (name || '?').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase() || '?');
+}
+const put = (p, ...kids) => { for (const k of kids) { if (k == null || k === false) continue; p.append(k); } return p; };
+const dots = () => el('span', 'dots', el('span', null, '.'), el('span', null, '.'), el('span', null, '.'));
+
+async function post(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Synergy-Token': TOKEN }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+  return j;
+}
+const showErr = (e) => { $('#err').textContent = e ? String(e.message || e) : ''; if (e) setTimeout(() => ($('#err').textContent = ''), 5000); };
+
+function renderTop() {
+  $('#proj').textContent = S.project ? S.project + ' · local' : '';
+  const w = S.agents.filter((a) => a.status === 'working').length;
+  $('#livetxt').textContent = 'Live · ' + w + ' agent' + (w === 1 ? '' : 's') + ' working';
+  $('#livedot').className = 'dot working';
+  const sel = $('#lang'); if (sel.value !== S.lang) sel.value = S.lang;
+}
+
+function renderAgents() {
+  const root = $('#agents'); root.replaceChildren();
+  $('#agents-title').textContent = 'Agents · ' + S.agents.length;
+  if (!S.agents.length) root.append(el('p', 'empty', 'No agents yet. They appear here as soon as they call a Synergy tool.'));
+  for (const a of S.agents) {
+    const tone = a.added > a.removed ? 'g' : a.removed > a.added ? 'r' : 'n';
+    const net = a.added - a.removed;
+    const working = a.status === 'working';
+    const card = el('div', 'card ' + tone + (a.status === 'offline' ? ' off' : ''));
+    card.dataset.kind = a.kind;
+    const st = el('div', 'st');
+    if (working) st.append('working', dots()); else st.append(a.status === 'idle' ? 'idle · ' + age(a.last_seen) : 'offline');
+    put(card,
+      el('div', 'top', avatar(a.kind, a.display, 'av'), el('div', null, el('div', 'nm', a.display), st), el('span', 'net', 'NET ' + (net > 0 ? '+' : net < 0 ? '\u2212' : '') + nf(Math.abs(net)))),
+      el('div', 'cnts',
+        el('div', 'cnt a', '+ ' + nf(a.added), working && dots()),
+        el('div', 'cnt d', '\u2212 ' + nf(a.removed), working && dots())),
+      el('p', 'sum', a.last_summary || 'No updates yet'),
+      a.last_file && el('div', 'file m', a.last_file));
+    root.append(card);
+  }
+}
+
+function renderConns() {
+  const root = $('#conns'); root.replaceChildren();
+  if (!S.agents.length) root.append(el('p', 'empty', 'Waiting for agents…'));
+  for (const a of S.agents) root.append(el('div', 'leaf', el('span', 'dot ' + a.status), el('span', 'nm', a.display), el('span', 'tag mut', a.status)));
+}
+
+function renderTree() {
+  const root = $('#tree'); root.replaceChildren();
+  const lockBy = new Map(S.locks.map((l) => [l.file, l.agent]));
+  const files = new Set([...S.tree, ...S.locks.map((l) => l.file), ...S.diffs.map((d) => d.file)]);
+  if (!files.size) return void root.append(el('p', 'empty', 'No files found.'));
+  const dirs = new Set(); const rows = [];
+  for (const f of [...files].sort((a, b) => a.localeCompare(b))) {
+    const parts = f.split('/');
+    let acc = '', hidden = false;
+    for (let i = 0; i < parts.length - 1; i++) {
+      acc = acc ? acc + '/' + parts[i] : parts[i];
+      if (!dirs.has(acc)) { dirs.add(acc); if (!hidden) rows.push({ dir: acc, depth: i, name: parts[i] }); }
+      if (S.collapsed.has(acc)) hidden = true;
+    }
+    if (!hidden) rows.push({ file: f, depth: parts.length - 1, name: parts[parts.length - 1] });
+  }
+  for (const r of rows) {
+    if (r.dir) {
+      const b = el('button', 'leaf', (S.collapsed.has(r.dir) ? '\u25b8 ' : '\u25be ') + r.name);
+      b.style.paddingLeft = 8 + r.depth * 14 + 'px'; b.type = 'button';
+      b.onclick = () => { S.collapsed.has(r.dir) ? S.collapsed.delete(r.dir) : S.collapsed.add(r.dir); renderTree(); };
+      root.append(b);
+    } else {
+      const b = el('button', 'leaf m' + (S.selected === r.file ? ' on' : ''), el('span', 'nm', r.name));
+      b.style.paddingLeft = 8 + r.depth * 14 + 'px'; b.type = 'button'; b.title = r.file;
+      const holder = lockBy.get(r.file);
+      if (holder) { const t = el('span', 'tag', 'locked \u00b7 ' + nameOf(holder)); t.dataset.kind = kindOf(holder); t.style.color = 'var(--ac)'; b.append(t); }
+      b.onclick = () => { S.selected = r.file; S.pinned = true; setTab('code'); loadDiff(); renderTree(); };
+      root.append(b);
+    }
+  }
+}
+
+function patchView(patch) {
+  const box = el('div', 'code'); let o = 0, n = 0;
+  for (const line of patch.split('\n')) {
+    if (/^(Index:|={5,}|--- |\+\+\+ )/.test(line) || line === '') continue;
+    if (line.startsWith('@@')) { const m = /@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(line); if (m) { o = +m[1]; n = +m[2]; } box.append(el('div', 'ln h', el('i', null, ''), el('b', null, ''), line)); continue; }
+    const c = line[0], txt = line.slice(1);
+    if (c === '+') box.append(el('div', 'ln a', el('i', null, n++), el('b', null, '+'), txt));
+    else if (c === '-') box.append(el('div', 'ln d', el('i', null, o++), el('b', null, '\u2212'), txt));
+    else if (c === ' ') { box.append(el('div', 'ln', el('i', null, n++), el('b', null, ''), txt)); o++; }
+  }
+  return box;
+}
+
+function renderDiff() {
+  const head = $('#diffhead'), body = $('#diff'); head.replaceChildren(); body.replaceChildren();
+  if (!S.selected) {
+    head.append('No file selected.');
+    body.append(el('p', 'empty', 'Pick a file in the explorer. Diffs appear when an agent locks a file, edits it, then posts a status or unlocks.'));
+    return;
+  }
+  head.append(el('span', 'm', S.selected));
+  const d = S.diffData && S.diffData.file === S.selected ? S.diffData.diffs : null;
+  if (!d) return void body.append(el('p', 'empty', 'Loading…'));
+  if (!d.length) return void body.append(el('p', 'empty', 'No changes captured for this file yet.'));
+  for (const x of d) {
+    body.append(el('div', 'dh', nameOf(x.agent) + ' \u00b7 ' + age(x.ts) + ' ago \u00b7 ', el('span', 'm', '+' + x.added + ' \u2212' + x.removed)), patchView(x.patch));
+  }
+}
+
+async function loadDiff() {
+  const f = S.selected; if (!f) return renderDiff();
+  try {
+    const r = await fetch('/api/diff?file=' + encodeURIComponent(f)); const j = await r.json();
+    if (S.selected === f) { S.diffData = { file: f, diffs: j.diffs || [] }; renderDiff(); }
+  } catch { /* shown as Loading */ }
+  renderDiff();
+}
+
+function bubble(e, me) {
+  const k = kindOf(e.agent);
+  const who = el('div', 'who', avatar(k, nameOf(e.agent), ''), nameOf(e.agent) + (e.to_agent ? ' \u2192 ' + (e.to_agent === 'all' ? 'all' : nameOf(e.to_agent)) : ''), el('span', 't', hhmm(e.ts)));
+  const b = el('div', 'bub' + (me ? ' me' : ''), who); b.dataset.kind = k; return b;
+}
+
+function renderChat() {
+  const box = $('#chat'); box.replaceChildren();
+  if (!S.events.length) box.append(el('p', 'empty', 'No messages yet. Agent updates, questions and file locks will show up here.'));
+  for (const e of S.events) {
+    if (e.type === 'lock') box.append(el('div', 'alert', nameOf(e.agent) + ' locked ', el('span', 'm', e.file)));
+    else if (e.type === 'unlock') box.append(el('div', 'alert', nameOf(e.agent) + ' unlocked ', el('span', 'm', e.file), (e.added || e.removed) ? ' (+' + e.added + ' \u2212' + e.removed + ')' : ''));
+    else if (e.type === 'system') box.append(el('div', 'alert', e.text));
+    else if (e.type === 'status') {
+      const b = bubble(e, false);
+      put(b, el('span', 'chip', e.action || 'INFO'), e.file && e.file !== '-' && el('span', 'm', e.file + ' '), el('div', null, e.text), (e.added || e.removed) ? el('div', 'file m', '+' + e.added + ' \u2212' + e.removed) : null);
+      box.append(b);
+    } else if (e.type === 'ask') {
+      const b = bubble(e, false);
+      put(b, e.reply_to && el('span', 'chip', 're #' + e.reply_to), el('span', 'chip', '?'), e.text); box.append(b);
+    } else if (e.type === 'human') {
+      const b = bubble(e, true); b.append(e.text); box.append(b);
+    }
+  }
+  if (S.follow) box.scrollTop = box.scrollHeight;
+  renderPause();
+}
+
+function isPaused() {
+  for (let i = S.events.length - 1; i >= 0; i--) { const e = S.events[i]; if (e.type === 'human') { if (e.text.startsWith('PAUSE:')) return true; if (e.text.startsWith('RESUME:')) return false; } }
+  return false;
+}
+function renderPause() { $('#pause').textContent = isPaused() ? 'Resume all' : 'Pause all'; }
+
+function renderControl() {
+  const c = $('#ctl'); c.replaceChildren();
+  c.append(el('div', null, el('h2', null, 'Active locks')));
+  if (!S.locks.length) c.lastChild.append(el('p', 'empty', 'No active locks.'));
+  else {
+    const t = el('table', null, el('tr', null, el('th', null, 'File'), el('th', null, 'Held by'), el('th', null, 'Since'), el('th', null, '')));
+    for (const l of S.locks) {
+      const b = el('button', 'btn', 'Force unlock'); b.type = 'button';
+      b.onclick = () => post('/api/unlock', { file: l.file }).then(() => showErr(null)).catch(showErr);
+      t.append(el('tr', null, el('td', 'm', l.file), el('td', null, nameOf(l.agent)), el('td', null, age(l.ts)), el('td', null, b)));
+    }
+    c.lastChild.append(t);
+  }
+  c.append(el('div', null, el('h2', null, 'Notes'), el('p', 'mut', 'Locks are advisory: Synergy tells agents not to edit locked files, it cannot block writes. A lock expires after 10 minutes unless its holder renews it. Agents write their summaries in the language selected at the top once they read the feed.')));
+}
+
+function setTab(t) {
+  S.tab = t; $('#main').dataset.tab = t;
+  for (const b of document.querySelectorAll('.tab')) { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); }
+}
+
+function renderAll() { renderTop(); renderAgents(); renderConns(); renderTree(); renderChat(); renderControl(); renderDiff(); }
+
+async function loadTree() { try { const j = await (await fetch('/api/tree')).json(); S.tree = j.files || []; renderTree(); } catch { /* ignore */ } }
+let treeTimer; const treeSoon = () => { clearTimeout(treeTimer); treeTimer = setTimeout(loadTree, 800); };
+
+// ---- wiring
+for (const b of document.querySelectorAll('.tab')) b.onclick = () => setTab(b.dataset.tab);
+$('#forcebtn').onclick = () => setTab('control');
+$('#pause').onclick = () => post('/api/message', { text: isPaused() ? 'RESUME: you may continue.' : 'PAUSE: stop editing and wait for the human.' }).catch(showErr);
+$('#send').onsubmit = (ev) => { ev.preventDefault(); const i = $('#msg'); const t = i.value.trim(); if (!t) return; post('/api/message', { text: t }).then(() => { i.value = ''; S.follow = true; showErr(null); }).catch(showErr); };
+$('#chat').onscroll = (ev) => { const c = ev.target; S.follow = c.scrollHeight - c.scrollTop - c.clientHeight < 40; };
+const sel = $('#lang'); for (const [v, n] of LANGS) sel.append(Object.assign(el('option', null, n), { value: v }));
+sel.onchange = () => post('/api/lang', { lang: sel.value }).catch(showErr);
+
+const es = new EventSource('/events');
+es.addEventListener('init', (m) => {
+  const d = JSON.parse(m.data);
+  Object.assign(S, { agents: d.state.agents, locks: d.state.locks, events: d.events, diffs: d.diffs, lang: d.lang, project: d.project });
+  if (!S.pinned && S.diffs.length) S.selected = S.diffs[S.diffs.length - 1].file;
+  renderAll(); loadDiff(); loadTree();
+});
+es.addEventListener('events', (m) => { S.events.push(...JSON.parse(m.data)); if (S.events.length > 300) S.events.splice(0, S.events.length - 300); renderChat(); });
+es.addEventListener('state', (m) => { const d = JSON.parse(m.data); S.agents = d.state.agents; S.locks = d.state.locks; S.lang = d.lang; renderTop(); renderAgents(); renderConns(); renderTree(); renderControl(); });
+es.addEventListener('diffs', (m) => {
+  const d = JSON.parse(m.data); S.diffs.push(...d); if (S.diffs.length > 100) S.diffs.splice(0, S.diffs.length - 100);
+  const last = d[d.length - 1];
+  if (!S.pinned) S.selected = last.file;
+  if (d.some((x) => x.file === S.selected)) loadDiff();
+  treeSoon(); renderTree();
+});
+es.onerror = () => { $('#livetxt').textContent = 'Reconnecting…'; $('#livedot').className = 'dot idle'; };
+es.onopen = () => renderTop();
+setInterval(() => { renderAgents(); renderConns(); renderControl(); }, 20000);
+setInterval(loadTree, 15000);
+})();
+</script>
+</body>
+</html>

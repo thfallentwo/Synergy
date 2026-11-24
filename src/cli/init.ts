@@ -69,7 +69,7 @@ export function init(opts: InitOptions = {}): void {
   const j = (a: string) => JSON.stringify({ mcpServers: { synergy: mcpEntry(root, a) } }, null, 2);
   say('\nConnect your agents (verify syntax against each client\u2019s docs):\n');
   say('Claude Code:');
-  say(`  claude mcp add synergy -e SYNERGY_AGENT=claude -- npx -y synergy-mcp serve --root "${root}"\n`);
+  say(`  claude mcp add synergy -e SYNERGY_AGENT=claude-code -- npx -y synergy-mcp serve --root "${root}"\n`);
   say('Cursor (.cursor/mcp.json):');
   say(j('cursor') + '\n');
   say('Gemini CLI (~/.gemini/settings.json or .gemini/settings.json):');

@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createPatch, diffLines } from 'diff';
 import { describeAgent, normalizeAgent } from './agents';
 import { normalizeFile } from './paths';
 import {
@@ -12,6 +15,8 @@ import {
 import type { DB } from './store';
 import type {
   AgentRow,
+  DiffInfo,
+  DiffRow,
   AgentStatus,
   AgentView,
   EventRow,
@@ -29,6 +34,9 @@ export interface SynergyOptions {
 
 const ASK_MAX_WORDS = 40;
 const DIGEST_MAX = 10;
+const MAX_SNAPSHOT_BYTES = 1_000_000;
+const MAX_PATCH_CHARS = 60_000;
+const DIFF_ACTIONS = ['MODIFIED', 'CREATED', 'DELETED', 'RENAMED'];
 const WORKING_MS = 60_000;
 const IDLE_MS = 15 * 60_000;
 
@@ -105,6 +113,59 @@ export class Synergy {
       .run(this.maxEvents);
   }
 
+  private readText(file: string): string | null {
+    try {
+      const p = path.join(this.root, file);
+      const st = fs.statSync(p);
+      if (!st.isFile() || st.size > MAX_SNAPSHOT_BYTES) return null;
+      const txt = fs.readFileSync(p, 'utf8');
+      return txt.includes('\0') ? null : txt;
+    } catch {
+      return null;
+    }
+  }
+
+  private takeSnapshot(agent: string, file: string): void {
+    this.db
+      .prepare('INSERT OR REPLACE INTO snapshots(file,agent,content) VALUES(?,?,?)')
+      .run(file, agent, this.readText(file) ?? '');
+  }
+
+  /**
+   * Compare the file now with the snapshot taken when `agent` locked it, record the diff,
+   * add it to the agent's totals and move the snapshot forward. Null when nothing changed.
+   */
+  private captureDiff(agent: string, file: string): { added: number; removed: number } | null {
+    const snap = this.db.prepare('SELECT agent, content FROM snapshots WHERE file=?').get(file) as
+      | { agent: string; content: string }
+      | undefined;
+    if (!snap || snap.agent !== agent) return null;
+    const exists = fs.existsSync(path.join(this.root, file));
+    const cur = exists ? this.readText(file) : '';
+    if (cur === null || cur === snap.content) return null;
+    let added = 0;
+    let removed = 0;
+    for (const part of diffLines(snap.content, cur)) {
+      if (part.added) added += part.count ?? 0;
+      else if (part.removed) removed += part.count ?? 0;
+    }
+    let patch = createPatch(file, snap.content, cur, '', '', { context: 3 });
+    if (patch.length > MAX_PATCH_CHARS) patch = patch.slice(0, MAX_PATCH_CHARS) + '\n\\ (truncated)\n';
+    this.db
+      .prepare('INSERT INTO diffs(ts,agent,file,added,removed,patch) VALUES(?,?,?,?,?,?)')
+      .run(this.clock(), agent, file, added, removed, patch);
+    this.db.prepare('UPDATE snapshots SET content=? WHERE file=?').run(cur, file);
+    this.db.prepare('UPDATE agents SET added=added+?, removed=removed+? WHERE name=?').run(added, removed, agent);
+    return { added, removed };
+  }
+
+  private dropLock(l: LockRow): { added: number; removed: number } | null {
+    const d = this.captureDiff(l.agent, l.file);
+    this.db.prepare('DELETE FROM locks WHERE file=?').run(l.file);
+    this.db.prepare('DELETE FROM snapshots WHERE file=?').run(l.file);
+    return d;
+  }
+
   private activeLocks(): LockRow[] {
     return this.db
       .prepare('SELECT * FROM locks WHERE expires_at > ? ORDER BY ts')
@@ -118,7 +179,7 @@ export class Synergy {
         .prepare('SELECT * FROM locks WHERE expires_at <= ?')
         .all(this.clock()) as LockRow[];
       for (const l of gone) {
-        this.db.prepare('DELETE FROM locks WHERE file=?').run(l.file);
+        this.dropLock(l);
         this.addEvent({
           agent: 'system',
           type: 'system',
@@ -179,19 +240,22 @@ export class Synergy {
     const file = input.file && input.file.trim() && input.file.trim() !== '-' ? this.file(input.file) : null;
     const { text, trimmed } = capWords(input.summary, MAX_WORDS);
     if (!text) throw new Error('summary is empty');
-    const added = Math.max(0, Math.trunc(input.added ?? 0));
-    const removed = Math.max(0, Math.trunc(input.removed ?? 0));
+    let added = Math.max(0, Math.trunc(input.added ?? 0));
+    let removed = Math.max(0, Math.trunc(input.removed ?? 0));
 
     return this.db
       .transaction(() => {
         this.ensureAgent(agent);
         this.sweepLocks();
+        // Measured diff (from the lock snapshot) beats whatever the agent claims.
+        const measured = file && DIFF_ACTIONS.includes(action) ? this.captureDiff(agent, file) : null;
+        if (measured) ({ added, removed } = measured);
         const id = this.addEvent({ agent, type: 'status', action, file, text, added, removed });
         this.db
           .prepare(
             'UPDATE agents SET last_file=?, last_summary=?, added=added+?, removed=removed+? WHERE name=?',
           )
-          .run(file, text, added, removed, agent);
+          .run(file, text, measured ? 0 : added, measured ? 0 : removed, agent);
         let out = `OK #${id}`;
         if (trimmed) out += ` (trimmed to ${MAX_WORDS}w)`;
         if (file) {
@@ -219,11 +283,13 @@ export class Synergy {
           out = `DENIED ${file} held by ${row.agent} ${fmtAge(now - row.ts)}, expires in ${free}`;
         } else if (row) {
           this.db.prepare('UPDATE locks SET expires_at=? WHERE file=?').run(now + this.lockTtlMs, file);
+          if (!this.db.prepare('SELECT 1 FROM snapshots WHERE file=?').get(file)) this.takeSnapshot(agent, file);
           out = `OK ${file} renewed ${ttlMin}m`;
         } else {
           this.db
             .prepare('INSERT INTO locks(file,agent,ts,expires_at) VALUES(?,?,?,?)')
             .run(file, agent, now, now + this.lockTtlMs);
+          this.takeSnapshot(agent, file);
           this.addEvent({ agent, type: 'lock', file });
           this.db.prepare('UPDATE agents SET last_file=? WHERE name=?').run(file, agent);
           out = `OK ${file} locked ${ttlMin}m`;
@@ -245,8 +311,8 @@ export class Synergy {
         if (!row) out = `OK ${file} not locked`;
         else if (row.agent !== agent) out = `DENIED ${file} held by ${row.agent}`;
         else {
-          this.db.prepare('DELETE FROM locks WHERE file=?').run(file);
-          this.addEvent({ agent, type: 'unlock', file });
+          const d = this.dropLock(row);
+          this.addEvent({ agent, type: 'unlock', file, added: d?.added, removed: d?.removed });
           out = `OK ${file} unlocked`;
         }
         return out + this.digest(agent);
@@ -282,7 +348,9 @@ export class Synergy {
         this.db.prepare('UPDATE agents SET read_cursor=? WHERE name=?').run(this.maxId(), agent);
         const now = this.clock();
         const feed = rows.length ? rows.map((r) => formatEvent(r, now)).join('\n') : 'FEED: empty';
-        return `${feed}\n${formatLocks(this.activeLocks(), now)}`;
+        const lang = this.getLang();
+        const head = lang === 'en' ? '' : `LANG ${lang} (write summaries in this language)\n`;
+        return `${head}${feed}\n${formatLocks(this.activeLocks(), now)}`;
       })
       .immediate();
   }
@@ -294,8 +362,8 @@ export class Synergy {
       .transaction(() => {
         const rows = this.db.prepare('SELECT * FROM locks WHERE agent=?').all(name) as LockRow[];
         for (const l of rows) {
-          this.db.prepare('DELETE FROM locks WHERE file=?').run(l.file);
-          this.addEvent({ agent: name, type: 'unlock', file: l.file });
+          const d = this.dropLock(l);
+          this.addEvent({ agent: name, type: 'unlock', file: l.file, added: d?.added, removed: d?.removed });
         }
         return rows.length;
       })
@@ -343,7 +411,7 @@ export class Synergy {
       .transaction(() => {
         const row = this.db.prepare('SELECT * FROM locks WHERE file=?').get(file) as LockRow | undefined;
         if (!row) return false;
-        this.db.prepare('DELETE FROM locks WHERE file=?').run(file);
+        this.dropLock(row);
         this.addEvent({ agent: 'system', type: 'system', file, text: `human force-unlocked ${file} (was ${row.agent})` });
         return true;
       })
@@ -377,5 +445,50 @@ export class Synergy {
     return (
       this.db.prepare('SELECT * FROM events ORDER BY id DESC LIMIT ?').all(limit) as EventRow[]
     ).reverse();
+  }
+
+  hasExpiredLocks(): boolean {
+    return !!this.db.prepare('SELECT 1 FROM locks WHERE expires_at <= ? LIMIT 1').get(this.clock());
+  }
+
+  maxDiffId(): number {
+    return (this.db.prepare('SELECT COALESCE(MAX(id),0) AS m FROM diffs').get() as { m: number }).m;
+  }
+
+  /** Latest diffs of one file, newest first, with patches (for the code preview). */
+  diffsForFile(rawFile: string, limit = 5): DiffRow[] {
+    return this.db
+      .prepare('SELECT * FROM diffs WHERE file=? ORDER BY id DESC LIMIT ?')
+      .all(this.file(rawFile), limit) as DiffRow[];
+  }
+
+  /** Diff metadata without patches. */
+  diffsSince(afterId: number, limit = 100): DiffInfo[] {
+    return this.db
+      .prepare('SELECT id,ts,agent,file,added,removed FROM diffs WHERE id>? ORDER BY id LIMIT ?')
+      .all(afterId, limit) as DiffInfo[];
+  }
+
+  recentDiffs(limit = 30): DiffInfo[] {
+    return (
+      this.db
+        .prepare('SELECT id,ts,agent,file,added,removed FROM diffs ORDER BY id DESC LIMIT ?')
+        .all(limit) as DiffInfo[]
+    ).reverse();
+  }
+
+  // ---------- summary language (agents are told via read_feed) ----------
+
+  getLang(): string {
+    const r = this.db.prepare("SELECT value FROM meta WHERE key='lang'").get() as { value: string } | undefined;
+    return r?.value ?? 'en';
+  }
+
+  setLang(lang: string): void {
+    const l = lang.trim().toLowerCase();
+    if (!/^[a-z]{2,3}(-[a-z]{2,4})?$/.test(l)) throw new Error('invalid language code');
+    this.db
+      .prepare("INSERT INTO meta(key,value) VALUES('lang',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(l);
   }
 }

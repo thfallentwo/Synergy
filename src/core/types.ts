@@ -46,3 +46,15 @@ export interface StateSnapshot {
   lastId: number;
   now: number;
 }
+
+export interface DiffRow {
+  id: number;
+  ts: number;
+  agent: string;
+  file: string;
+  added: number;
+  removed: number;
+  patch: string;
+}
+
+export type DiffInfo = Omit<DiffRow, 'patch'>;

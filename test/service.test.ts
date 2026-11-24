@@ -55,7 +55,7 @@ describe('locks', () => {
     const { svc } = memSynergy();
     svc.lockFile({ agent: 'claude', file: 'a.ts' });
     svc.lockFile({ agent: 'claude', file: 'b.ts' });
-    expect(svc.releaseAgentLocks('Claude Code')).toBe(2);
+    expect(svc.releaseAgentLocks('Claude')).toBe(2);
     expect(svc.state().locks).toHaveLength(0);
   });
   it('human /lock and /unlock', () => {
@@ -103,7 +103,7 @@ describe('ask + human', () => {
     const { svc } = memSynergy();
     svc.readFeed({ agent: 'claude' });
     svc.readFeed({ agent: 'gemini' });
-    svc.askAgent({ from: 'cursor', to: 'Claude Code', question: 'Is role optional?' });
+    svc.askAgent({ from: 'cursor', to: 'Claude', question: 'Is role optional?' });
     expect(svc.postStatus({ agent: 'claude', action: 'INFO', file: '-', summary: 'ok' })).toContain('cursor\u2192claude ? Is role optional?');
     expect(svc.postStatus({ agent: 'gemini', action: 'INFO', file: '-', summary: 'ok' })).not.toContain('Is role optional');
     expect(svc.readFeed({ agent: 'gemini' })).toContain('Is role optional');

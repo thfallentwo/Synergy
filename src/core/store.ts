@@ -38,9 +38,24 @@ CREATE TABLE IF NOT EXISTS locks(
   ts INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS snapshots(
+  file TEXT PRIMARY KEY,
+  agent TEXT NOT NULL,
+  content TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS diffs(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  agent TEXT NOT NULL,
+  file TEXT NOT NULL,
+  added INTEGER NOT NULL,
+  removed INTEGER NOT NULL,
+  patch TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS diffs_file ON diffs(file, id);
 `;
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** Open (and migrate) the Synergy database. Use ':memory:' for tests. */
 export function openDb(file: string): DB {
@@ -50,8 +65,8 @@ export function openDb(file: string): DB {
   db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = NORMAL');
   db.exec(SCHEMA);
-  db.prepare("INSERT OR IGNORE INTO meta(key,value) VALUES('schema_version', ?)").run(
-    String(SCHEMA_VERSION),
-  );
+  db.prepare(
+    "INSERT INTO meta(key,value) VALUES('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+  ).run(String(SCHEMA_VERSION));
   return db;
 }

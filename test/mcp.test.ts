@@ -26,7 +26,7 @@ describe('MCP tools', () => {
   });
 
   it('post_status / lock_file / read_feed round trip using the default agent', async () => {
-    const { call } = await connect('Claude Code');
+    const { call } = await connect('Claude');
     expect((await call('lock_file', { file: 'src/auth.ts' })).text).toMatch(/^OK src\/auth\.ts locked/);
     expect((await call('post_status', { action: 'MODIFIED', file: 'src/auth.ts', summary: 'Added role field to User' })).text).toMatch(/^OK #2/);
     const feed = (await call('read_feed', { limit: 5 })).text;
