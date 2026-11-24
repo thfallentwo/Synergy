@@ -1,0 +1,43 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+export const SYNERGY_DIR = '.synergy';
+
+/** Make a file path project-relative, POSIX-style, and refuse anything outside the root. */
+export function normalizeFile(root: string, file: string): string {
+  let f = file.trim().replace(/\\/g, '/');
+  if (!f) throw new Error('file is empty');
+  const rootPosix = path.resolve(root).replace(/\\/g, '/').replace(/\/+$/, '');
+  if (f.startsWith('/') || /^[a-zA-Z]:\//.test(f)) {
+    const cmp = (s: string) => (process.platform === 'win32' ? s.toLowerCase() : s);
+    if (cmp(f).startsWith(cmp(rootPosix) + '/')) f = f.slice(rootPosix.length + 1);
+    else throw new Error('file is outside the project root');
+  }
+  const norm = path.posix.normalize(f).replace(/^(\.\/)+/, '');
+  if (norm === '..' || norm.startsWith('../')) throw new Error('file is outside the project root');
+  if (norm === '.' || norm === '') throw new Error('file is empty');
+  return norm.replace(/\/+$/, '');
+}
+
+/** Walk upwards from `start` looking for an existing .synergy directory. */
+export function findRoot(start: string): string | null {
+  let dir = path.resolve(start);
+  for (;;) {
+    if (fs.existsSync(path.join(dir, SYNERGY_DIR))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/** Resolve the project root: explicit --root, SYNERGY_DIR env, nearest .synergy, else cwd. */
+export function resolveRoot(opts: { root?: string; cwd?: string } = {}): string {
+  if (opts.root) return path.resolve(opts.root);
+  if (process.env.SYNERGY_DIR) return path.resolve(process.env.SYNERGY_DIR);
+  const cwd = opts.cwd ?? process.cwd();
+  return findRoot(cwd) ?? path.resolve(cwd);
+}
+
+export function dbPath(root: string): string {
+  return path.join(root, SYNERGY_DIR, 'synergy.db');
+}
