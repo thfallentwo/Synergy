@@ -3,3 +3,4 @@ dist
 .synergy
 *.log
 .DS_Store
+*.tgz

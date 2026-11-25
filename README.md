@@ -5,7 +5,7 @@ share one tiny, local MCP room: they lock files, post ultra-short status lines a
 questions, so they stop overwriting each other's work. You watch (and steer) everything from a live
 dashboard.
 
-![Synergy dashboard](docs/dashboard.png)
+![Synergy dashboard](https://raw.githubusercontent.com/thfallentwo/Synergy/main/docs/dashboard.png)
 
 - **Local-first.** One SQLite file in `.synergy/`. No accounts, no cloud, nothing leaves your machine.
 - **Ultra-low token cost.** Five tiny tools. Messages are capped at 20 words. Every tool reply ends
@@ -92,6 +92,10 @@ Browser ◀──SSE── synergy ui (127.0.0.1) ─────────┘
 
 ## Known limitations
 
+- Requires Node 20+. The SQLite driver (`better-sqlite3`) ships prebuilt binaries for common platforms;
+  on an unusual platform npm falls back to compiling it, which needs a C++ toolchain.
+- `synergy serve` / `synergy ui` refuse to guess a project: they need an existing `.synergy/` (run `init`)
+  or `--root`, so a client launching them from `$HOME` never leaves stray files behind.
 - Diff measurement needs agents to lock a file before editing it. Otherwise only self-reported
   counts (if any) are shown.
 - Files over 1 MB and binary files are not diffed.

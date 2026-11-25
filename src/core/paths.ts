@@ -38,6 +38,20 @@ export function resolveRoot(opts: { root?: string; cwd?: string } = {}): string 
   return findRoot(cwd) ?? path.resolve(cwd);
 }
 
+/**
+ * Like resolveRoot, but never guesses: without --root / SYNERGY_DIR it needs an existing .synergy/
+ * above the working directory. Prevents stray databases when a client starts us from $HOME or `/`.
+ */
+export function requireRoot(opts: { root?: string; cwd?: string } = {}): string {
+  if (opts.root) return path.resolve(opts.root);
+  if (process.env.SYNERGY_DIR) return path.resolve(process.env.SYNERGY_DIR);
+  const found = findRoot(opts.cwd ?? process.cwd());
+  if (!found) {
+    throw new Error('No .synergy/ directory found. Run `npx synergy-mcp init` in your project, or pass --root <dir>.');
+  }
+  return found;
+}
+
 export function dbPath(root: string): string {
   return path.join(root, SYNERGY_DIR, 'synergy.db');
 }

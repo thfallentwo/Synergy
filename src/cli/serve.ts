@@ -1,5 +1,5 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { dbPath, resolveRoot } from '../core/paths';
+import { dbPath, requireRoot } from '../core/paths';
 import { Synergy } from '../core/service';
 import { openDb } from '../core/store';
 import { createMcpServer } from '../mcp/server';
@@ -11,7 +11,7 @@ export async function serve(opts: { root?: string }): Promise<void> {
   console.info = console.log;
   console.debug = console.log;
 
-  const root = resolveRoot({ root: opts.root });
+  const root = requireRoot({ root: opts.root });
   const db = openDb(dbPath(root));
   const svc = new Synergy(db, { root });
   const { server, releaseAll } = createMcpServer(svc, { defaultAgent: process.env.SYNERGY_AGENT });

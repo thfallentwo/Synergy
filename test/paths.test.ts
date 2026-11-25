@@ -29,3 +29,21 @@ describe('findRoot', () => {
     expect(fs.realpathSync(findRoot(deep)!)).toBe(fs.realpathSync(root));
   });
 });
+
+import { requireRoot } from '../src/core/paths';
+
+describe('requireRoot', () => {
+  it('refuses to guess without .synergy, honours --root, finds existing', () => {
+    const saved = process.env.SYNERGY_DIR;
+    delete process.env.SYNERGY_DIR;
+    try {
+      const bare = tmpRoot();
+      expect(() => requireRoot({ cwd: bare })).toThrow(/No \.synergy\/ directory found/);
+      expect(requireRoot({ root: bare })).toBe(path.resolve(bare));
+      fs.mkdirSync(path.join(bare, '.synergy'));
+      expect(fs.realpathSync(requireRoot({ cwd: bare }))).toBe(fs.realpathSync(bare));
+    } finally {
+      if (saved !== undefined) process.env.SYNERGY_DIR = saved;
+    }
+  });
+});

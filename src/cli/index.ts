@@ -44,6 +44,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('[synergy] fatal:', e);
+  console.error(`[synergy] ${e instanceof Error ? e.message : e}`);
   process.exit(1);
 });

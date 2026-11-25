@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { dbPath, resolveRoot } from '../core/paths';
+import { dbPath, requireRoot } from '../core/paths';
 import { Synergy } from '../core/service';
 import { openDb } from '../core/store';
 import { runDemo, seedProject } from '../demo/scenario';
@@ -26,7 +26,7 @@ export async function ui(opts: UiCliOptions): Promise<void> {
     seedProject(root);
     cleanup = () => fs.rmSync(root, { recursive: true, force: true });
   } else {
-    root = resolveRoot({ root: opts.root });
+    root = requireRoot({ root: opts.root });
   }
   const db = openDb(dbPath(root));
   const svc = new Synergy(db, { root });
