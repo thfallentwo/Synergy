@@ -13,6 +13,6 @@ Keep every message tiny. Never paste code into messages.
 6. Lines starting with \`!\` come from the human. Follow them first.
 7. Locks expire after ${lockMinutes} min. Call \`lock_file\` again to renew.
 8. Every tool reply ends with NEW messages for you. Read them.
-9. If `read_feed` starts with `LANG xx`, write your summaries in that language.
+9. If \`read_feed\` starts with \`LANG xx\`, write your summaries in that language.
 `;
 }
