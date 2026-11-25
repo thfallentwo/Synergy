@@ -113,7 +113,7 @@ npm run build   # tsup -> dist/
 ## Trademarks and logos
 
 Product names, logos and brands shown in the dashboard (including Claude, Claude Code, Anthropic,
-Cursor, Gemini, Google, OpenAI, Codex, GitHub Copilot, Microsoft, Antigravity and Kimi) are the
+Cursor, Gemini, Google, OpenAI, Codex, GitHub Copilot, Microsoft, Antigravity, Kimi, Hermes Agent / Nous Research and Grok / xAI) are the
 property of their respective owners. They are used for identification only. Synergy is an
 independent open-source project and is not affiliated with, endorsed by or sponsored by any of them.
 

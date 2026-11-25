@@ -6,6 +6,8 @@ const KINDS: Array<[RegExp, string]> = [
   [/antigravity/i, 'antigravity'],
   [/codex|openai|chatgpt/i, 'codex'],
   [/kimi|moonshot/i, 'kimi'],
+  [/hermes/i, 'hermes'],
+  [/grok/i, 'grok'],
   [/copilot/i, 'copilot'],
   [/windsurf/i, 'windsurf'],
   [/^(human|you|user|dev|developer)$/i, 'human'],
@@ -33,6 +35,8 @@ const PRETTY: Record<string, string> = {
   codex: 'Codex',
   copilot: 'Copilot',
   kimi: 'Kimi',
+  hermes: 'Hermes Agent',
+  grok: 'Grok Bot',
   windsurf: 'Windsurf',
   human: '[Human]',
 };

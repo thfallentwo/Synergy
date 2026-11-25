@@ -90,6 +90,8 @@ th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em
 [data-kind=cursor]{--ac:#d0d4dc;--bg2:#222733;--bd:#3d4559}
 [data-kind=codex]{--ac:#e6e9ef;--bg2:#1f2630;--bd:#3a4553}
 [data-kind=copilot]{--ac:#d9a8ff;--bg2:#2a1f3d;--bd:#58427f}
+[data-kind=hermes]{--ac:#e6c98a;--bg2:#2b2518;--bd:#5e5230}
+[data-kind=grok]{--ac:#e6e9ef;--bg2:#1c1f26;--bd:#3b4150}
 [data-kind=kimi]{--ac:#8bbcff;--bg2:#162136;--bd:#2f4a73}
 [data-kind=human]{--ac:#e6e9ef;--bg2:#1d2230;--bd:#3a4258}
 @media (max-width:900px){.cols{flex-direction:column;overflow:auto}#left,#right{width:auto;border:0}main{min-height:600px}}
@@ -139,7 +141,7 @@ th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em
 (() => {
 const $ = (s) => document.querySelector(s);
 const TOKEN = $('meta[name=synergy-token]').content;
-const ICONS = new Set(['claude','claude-code','antigravity','codex','gemini','copilot','cursor','kimi']);
+const ICONS = new Set(['claude','claude-code','antigravity','codex','gemini','copilot','cursor','kimi','hermes','grok']);
 const LANGS = [['en','English'],['tr','Türkçe'],['de','Deutsch'],['es','Español'],['fr','Français'],['pt','Português'],['ru','Русский'],['ja','日本語'],['zh','中文']];
 const S = { agents: [], locks: [], events: [], diffs: [], tree: [], lang: 'en', project: '', selected: null, pinned: false, tab: 'code', follow: true, diffData: null, collapsed: new Set() };
 

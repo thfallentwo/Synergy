@@ -52,6 +52,8 @@ describe('normalizeAgent', () => {
     for (const n of ['Claude', 'CLAUDE', ' claude ']) expect(normalizeAgent(n)).toBe('claude');
     for (const n of ['Claude Code', 'claude-code', 'ClaudeCode']) expect(normalizeAgent(n)).toBe('claude-code');
     expect(normalizeAgent('Kimi CLI')).toBe('kimi');
+    expect(normalizeAgent('Hermes Agent')).toBe('hermes');
+    expect(normalizeAgent('Grok Bot')).toBe('grok');
     expect(normalizeAgent('Cursor')).toBe('cursor');
     expect(normalizeAgent('Gemini CLI')).toBe('gemini');
     expect(normalizeAgent('OpenAI Codex')).toBe('codex');
