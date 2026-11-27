@@ -1,6 +1,6 @@
 import { apiGet, apiPost, connectSse } from './api.js';
 import { wireCustomSelects } from './customSelect.js';
-import { renderRightPanel, renderViewOverlay } from './panels.js';
+import { getSessionRollups, renderRightPanel, renderViewOverlay } from './panels.js';
 import {
   expandedMessages,
   isActiveChatLocked,
@@ -1010,6 +1010,19 @@ function wireEvents() {
       if (mcpTab) {
         store.mcpClientTab = mcpTab.dataset.mcpTab;
         renderViewOverlay(handleCanvasSend);
+        return;
+      }
+
+      const connectBtn = t.closest('[data-connect-session], [data-disconnect-session]');
+      if (connectBtn) {
+        const chatId = store.state?.activeChatId;
+        if (chatId == null) return;
+        const { boundIds } = getSessionRollups();
+        const next = new Set(boundIds);
+        if (connectBtn.dataset.connectSession) next.add(connectBtn.dataset.connectSession);
+        if (connectBtn.dataset.disconnectSession) next.delete(connectBtn.dataset.disconnectSession);
+        await apiPost('/api/chats/bind-sessions', { chatId, sessionIds: [...next] });
+        showToast(connectBtn.dataset.connectSession ? 'Oturum sohbete bağlandı' : 'Oturum sohbetten ayrıldı');
         return;
       }
 

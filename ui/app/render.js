@@ -1,6 +1,6 @@
 import { renderCustomSelect } from './customSelect.js';
 import { escapeHtml, renderMarkdown } from './markdown.js';
-import { lucideIcon, renderRightPanel, renderViewOverlay } from './panels.js';
+import { diffBadge, getSessionRollups, lucideIcon, renderRightPanel, renderViewOverlay } from './panels.js';
 import { renderSearchOverlay } from './search.js';
 import {
   EFFORT_LABELS,
@@ -173,9 +173,10 @@ export function renderTopbar() {
         const dotCls = online ? 'dot-live' : 'dot-idle';
         const statusLabel = online ? 'Bağlı' : 'MCP';
         return `<button type="button" class="pill-chip" data-view="agents" title="${escapeHtml(a.reason || '')}">
-          <span class="${dotCls}"></span>
+          <img class="chip-logo" src="${agentIconPath(a.agent)}" alt="" />
           <span>${escapeHtml(a.display)}</span>
           <span style="opacity:.65">· ${statusLabel}</span>
+          ${diffBadge(room?.added, room?.removed)}
         </button>`;
       })
       .filter(Boolean);
@@ -210,8 +211,10 @@ export function renderMessages() {
 
   const events = store.events ?? [];
   const pending = store.state?.pendingCommands ?? [];
-  stage.dataset.empty = events.length === 0 && pending.length === 0 ? 'true' : 'false';
-  if (events.length === 0 && pending.length === 0) {
+  const bound = getSessionRollups().connected;
+  const isEmptyChat = events.length === 0 && pending.length === 0 && bound.length === 0;
+  stage.dataset.empty = isEmptyChat ? 'true' : 'false';
+  if (isEmptyChat) {
     container.innerHTML = '';
     return;
   }
@@ -281,6 +284,24 @@ export function renderMessages() {
           ${imgHtml}
           ${bodyBlock}
           ${expandBtn}
+        </div>
+      </article>
+    `);
+  }
+
+  for (const r of bound) {
+    const state = r.working ? 'Working' : 'Tamamlandı';
+    const sum = r.finalText || r.lastLabel || (r.working ? 'İşlem sürüyor…' : 'Hazır');
+    html.push(`
+      <article class="msg-agent msg-live-session">
+        <img class="msg-avatar" src="${agentIconPath(r.agent)}" alt="${escapeHtml(r.agent)}" />
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="msg-author">${escapeHtml(r.title || agentDisplay(r.agent))}</span>
+            <span class="msg-tag">${lucideIcon(r.working ? 'working' : 'check')} ${state}</span>
+            ${diffBadge(r.added, r.removed)}
+          </div>
+          <div class="msg-text">${renderMarkdown(String(sum).slice(0, 600))}</div>
         </div>
       </article>
     `);

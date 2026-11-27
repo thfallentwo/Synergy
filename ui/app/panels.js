@@ -148,76 +148,165 @@ function renderUsageBars(usage) {
     .join('');
 }
 
+export function diffBadge(added, removed) {
+  const a = Math.max(0, Number(added) || 0);
+  const r = Math.max(0, Number(removed) || 0);
+  if (!a && !r) return '';
+  return `<span class="diff-badge" title="Eklenen / silinen satır"><span class="diff-add">+${a}</span><span class="diff-del">-${r}</span></span>`;
+}
+
+function activeChatSessionIds() {
+  const chats = store.state?.chats ?? [];
+  const active = chats.find((c) => c.id === store.state?.activeChatId);
+  if (!active?.live_sessions) return new Set();
+  try {
+    const arr = JSON.parse(active.live_sessions);
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** One rollup per IDE session (deduped by sessionId), split by whether it is bound to the active chat. */
+export function getSessionRollups() {
+  const bound = activeChatSessionIds();
+  const turns = Array.isArray(store.liveTurns) ? store.liveTurns : [];
+  const metaById = new Map((store.liveSessions ?? []).map((s) => [s.sessionId, s]));
+  const byId = new Map();
+
+  for (const t of turns) {
+    const id = t.sessionId || t.turnId || t.agent;
+    if (!id) continue;
+    let r = byId.get(id);
+    if (!r) {
+      const meta = metaById.get(id);
+      r = {
+        sessionId: id,
+        agent: t.agent || meta?.agent || 'agent',
+        title: t.sessionTitle || meta?.title || '',
+        added: 0,
+        removed: 0,
+        working: false,
+        lastLabel: '',
+        lastFile: '',
+        finalText: '',
+        updatedAt: 0,
+        turns: 0,
+      };
+      byId.set(id, r);
+    }
+    r.turns += 1;
+    for (const s of t.steps ?? []) {
+      r.added += s.added ?? 0;
+      r.removed += s.removed ?? 0;
+      if (s.label) r.lastLabel = s.label;
+      if (s.file) r.lastFile = s.file;
+    }
+    if (t.status === 'working') r.working = true;
+    if (t.finalText) r.finalText = t.finalText;
+    r.updatedAt = Math.max(r.updatedAt, t.finishedAt || t.startedAt || 0);
+  }
+
+  for (const meta of store.liveSessions ?? []) {
+    if (!byId.has(meta.sessionId)) {
+      byId.set(meta.sessionId, {
+        sessionId: meta.sessionId,
+        agent: meta.agent,
+        title: meta.title || '',
+        added: 0,
+        removed: 0,
+        working: Boolean(meta.active),
+        lastLabel: '',
+        lastFile: '',
+        finalText: '',
+        updatedAt: meta.updatedAt || 0,
+        turns: meta.turnCount || 0,
+      });
+    }
+  }
+
+  const all = [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+  return {
+    connected: all.filter((r) => bound.has(r.sessionId)),
+    detected: all.filter((r) => !bound.has(r.sessionId)).slice(0, 6),
+    boundIds: bound,
+  };
+}
+
+function renderSessionCard(r, isBound) {
+  const act = r.working ? { kind: 'working', label: 'Working' } : { kind: 'idle', label: 'Idle' };
+  const sum = r.finalText || r.lastLabel || (r.working ? 'İşlem sürüyor…' : 'Hazır');
+  return `
+    <div class="live-agent-row${r.working ? ' is-working' : ''}">
+      <div class="live-agent-head">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <img class="agent-icon" src="${agentIconPath(r.agent)}" alt="" />
+          <span class="live-agent-name">${escapeHtml(r.title || agentDisplay(r.agent))}</span>
+        </div>
+        <span class="live-act-badge is-${act.kind}">${lucideIcon(act.kind)}<span>${act.label}</span></span>
+      </div>
+      <div class="live-agent-meta">
+        ${diffBadge(r.added, r.removed)}
+        ${r.lastFile ? `<span class="live-agent-file mono-text">${escapeHtml(r.lastFile)}</span>` : ''}
+      </div>
+      <div class="live-agent-summary">${escapeHtml(String(sum).slice(0, 140))}</div>
+      <div class="live-agent-actions">
+        ${
+          isBound
+            ? `<button type="button" class="sub-chip active" data-disconnect-session="${escapeHtml(r.sessionId)}">Bağlı · Ayır</button>`
+            : `<button type="button" class="sub-chip" data-connect-session="${escapeHtml(r.sessionId)}">Connect to Conversation</button>`
+        }
+      </div>
+    </div>`;
+}
+
 function renderLiveTab() {
-  const liveTurns = Array.isArray(store.liveTurns) ? store.liveTurns : [];
-  const stateAgents = (store.state?.agents ?? []).filter((a) => a.status !== 'offline');
-  const seen = new Set();
-  const rows = [];
-
-  for (const t of liveTurns) {
-    const slug = t.agent || t.name || 'agent';
-    seen.add(slug);
-    const act = detectActivityKind({ ...t, active: true });
-    rows.push({
-      slug,
-      display: t.display || agentDisplay(slug),
-      kind: act.kind,
-      label: act.label,
-      file: t.file || t.last_file || '',
-      summary: t.summary || t.text || 'İşlem sürüyor...',
-      isWorking: true,
+  const { connected, detected } = getSessionRollups();
+  const sessionAgents = new Set([...connected, ...detected].map((r) => r.agent));
+  const roomRows = (store.state?.agents ?? [])
+    .filter((a) => a.status !== 'offline' && !sessionAgents.has(a.name))
+    .map((a) => {
+      const working = a.status === 'working';
+      const act = working ? { kind: 'working', label: 'Working' } : { kind: 'idle', label: 'Idle' };
+      return `
+    <div class="live-agent-row${working ? ' is-working' : ''}">
+      <div class="live-agent-head">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <img class="agent-icon" src="${agentIconPath(a.name)}" alt="" />
+          <span class="live-agent-name">${escapeHtml(a.display || agentDisplay(a.name))}</span>
+        </div>
+        <span class="live-act-badge is-${act.kind}">${lucideIcon(act.kind)}<span>${act.label}</span></span>
+      </div>
+      <div class="live-agent-meta">${diffBadge(a.added, a.removed)}${a.last_file ? `<span class="live-agent-file mono-text">${escapeHtml(a.last_file)}</span>` : ''}</div>
+      <div class="live-agent-summary">${escapeHtml(String(a.last_summary || (working ? 'Görev üzerinde çalışıyor' : 'Hazır')).slice(0, 140))}</div>
+    </div>`;
     });
-  }
 
-  for (const a of stateAgents) {
-    if (seen.has(a.name)) continue;
-    const isWorking = a.status === 'working';
-    const act = detectActivityKind(a);
-    rows.push({
-      slug: a.name,
-      display: a.display || agentDisplay(a.name),
-      kind: isWorking ? (act.kind === 'idle' ? 'working' : act.kind) : 'idle',
-      label: isWorking ? (act.kind === 'idle' ? 'Working' : act.label) : 'Idle',
-      file: a.last_file || '',
-      summary: a.last_summary || (isWorking ? 'Görev üzerinde çalışıyor' : 'Hazır'),
-      isWorking,
-    });
-  }
-
-  const activeCount = rows.filter((r) => r.isWorking).length;
+  const activeCount = [...connected, ...detected].filter((r) => r.working).length;
   const readyCount = runnableAgents().length;
   const usage = store.usage || { resetInMs: 0, items: [] };
 
   return `
     <div class="card">
       <div class="card-title">
-        <span>Şu An Çalışıyor</span>
+        <span>Bu Sohbete Bağlı</span>
+        <span class="agent-badge">${connected.length}</span>
+      </div>
+      ${
+        connected.length
+          ? `<div class="live-activity-list">${connected.map((r) => renderSessionCard(r, true)).join('')}</div>`
+          : '<div class="card-desc">Bağlı IDE oturumu yok. Aşağıdan bir oturumu bu sohbete bağla.</div>'
+      }
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>Tespit Edilen Oturumlar</span>
         <span class="agent-badge">${activeCount > 0 ? `${activeCount} Aktif` : `${readyCount} Hazır`}</span>
       </div>
       ${
-        rows.length
-          ? `<div class="live-activity-list">
-              ${rows
-                .map(
-                  (r) => `
-                <div class="live-agent-row${r.isWorking ? ' is-working' : ''}">
-                  <div class="live-agent-head">
-                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                      <img class="agent-icon" src="${agentIconPath(r.slug)}" alt="" />
-                      <span class="live-agent-name">${escapeHtml(r.display)}</span>
-                    </div>
-                    <span class="live-act-badge is-${escapeHtml(r.kind)}">
-                      ${lucideIcon(r.kind)}
-                      <span>${escapeHtml(r.label)}</span>
-                    </span>
-                  </div>
-                  ${r.file ? `<div class="live-agent-file mono-text">${escapeHtml(r.file)}</div>` : ''}
-                  <div class="live-agent-summary">${escapeHtml(String(r.summary).slice(0, 120))}</div>
-                </div>
-              `,
-                )
-                .join('')}
-            </div>`
+        detected.length || roomRows.length
+          ? `<div class="live-activity-list">${detected.map((r) => renderSessionCard(r, false)).join('')}${roomRows.join('')}</div>`
           : `<div class="card-desc">Şu an aktif görev yok — ajanlar hazır (${readyCount} çalıştırılabilir ajan).</div>`
       }
     </div>
