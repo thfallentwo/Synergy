@@ -472,6 +472,11 @@ function renderAgentsView() {
                   <div class="muted-sub">MCP Dosyası: <code>${escapeHtml(snip.path)}</code></div>
                   <pre class="mono-box">${escapeHtml(snip.text || 'MCP yapılandırması yükleniyor...')}</pre>
                   <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    ${
+                      a.agent === 'antigravity' || a.agent === 'cursor'
+                        ? `<button type="button" class="btn btn-primary" data-install-mcp="${escapeHtml(a.agent)}">Otomatik Bağla (1-Tık)</button>`
+                        : ''
+                    }
                     <button type="button" class="btn" data-copy-encoded="${encodeURIComponent(snip.text)}">MCP Yapılandırmasını Kopyala</button>
                     <button type="button" class="btn" data-open-agent="${escapeHtml(a.agent)}">Editörü Aç</button>
                   </div>

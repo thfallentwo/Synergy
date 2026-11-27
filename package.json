@@ -1,6 +1,6 @@
 {
   "name": "synergy-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Masiva Labs (synergy-mcp): local multi-agent coding orchestrator + ultra-low-token MCP server with shared project memory and file locks.",
   "type": "module",
   "license": "MIT",
@@ -27,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thfallentwo/Synergy.git"
+    "url": "git+https://github.com/thfallentwo/MasivaLabs.git"
   },
   "keywords": [
     "mcp",
@@ -54,9 +54,9 @@
     "vitest": "^5.1.1"
   },
   "author": "thfallentwo",
-  "homepage": "https://github.com/thfallentwo/Synergy#readme",
+  "homepage": "https://github.com/thfallentwo/MasivaLabs#readme",
   "bugs": {
-    "url": "https://github.com/thfallentwo/Synergy/issues"
+    "url": "https://github.com/thfallentwo/MasivaLabs/issues"
   },
   "main": "dist/index.js"
 }

@@ -246,7 +246,7 @@ describe('dashboard server', () => {
 
     const del = await (await postJson(base, '/api/roles/delete', { id: created.id }, h)).json();
     expect(del).toEqual({ deleted: true });
-    expect(svc.listRoles()).toHaveLength(1);
+    expect(svc.listRoles()).toHaveLength(0);
   });
 
   it('supports multi-chat endpoints and opening another project folder', async () => {
@@ -299,38 +299,6 @@ describe('dashboard server', () => {
     expect(created.project).toMatchObject({ name: 'CustomProj', emoji: '🎮', color: '#3fb950' });
   });
 
-  it('supports meeting room start, hand/floor, mute/deaf, notes, and end endpoints', async () => {
-    const { base, srv, svc } = await boot();
-    const h = { 'X-Synergy-Token': srv.token };
-    svc.readFeed({ agent: 'claude' });
-    svc.readFeed({ agent: 'deepseek' });
-
-    const mt = await (await postJson(base, '/api/meeting/start', { title: 'API Bug Meeting' }, h)).json();
-    expect(mt.status).toBe('active');
-    expect(mt.seats.slice().sort()).toEqual(['claude', 'deepseek']);
-
-    await postJson(base, '/api/meeting/raise-hand', { agent: 'claude', reason: 'Check logs' }, h);
-    await postJson(base, '/api/meeting/grant', { agent: 'claude' }, h);
-    const spoke = await (await postJson(base, '/api/meeting/speak', { from: 'claude', text: 'Inspect trace first' }, h)).json();
-    expect(spoke.messageId).toBe(1);
-
-    await postJson(base, '/api/meeting/mute', { agent: 'deepseek', muted: true }, h);
-    const deafened = await (await postJson(base, '/api/meeting/deaf', { agent: 'codex', deaf: true }, h)).json();
-    expect(deafened.mutedAgents).toContain('deepseek');
-    expect(deafened.deafAgents).toContain('codex');
-
-    const accepted = await (await postJson(base, '/api/meeting/accept-note', { messageId: 1 }, h)).json();
-    expect(accepted.notes).toHaveLength(1);
-
-    const listRes = await (await fetch(base + '/api/meeting/notes')).json();
-    expect(listRes.files).toHaveLength(1);
-    const fileRes = await (await fetch(base + '/api/meeting/notes?file=' + encodeURIComponent(listRes.files[0].file))).json();
-    expect(fileRes.content).toContain('Inspect trace first');
-
-    const ended = await (await postJson(base, '/api/meeting/end', {}, h)).json();
-    expect(ended.ended.status).toBe('ended');
-  });
-
   it('supports incognito chat creation, provider API keys, and skills listing endpoints', async () => {
     const { base, srv } = await boot();
     const h = { 'X-Synergy-Token': srv.token };
@@ -351,8 +319,9 @@ describe('dashboard server', () => {
     const skillsRes = await (await fetch(base + '/api/skills')).json();
     expect(Array.isArray(skillsRes.skills)).toBe(true);
 
-    const trRes = await (await postJson(base, '/api/translate', { text: '@gemini /goal UI API', targetLang: 'en' }, h)).json();
-    expect(trRes.translated).toBe('@gemini /goal UI API');
+    const installRes = await (await postJson(base, '/api/mcp/install', { client: 'cursor' }, h)).json();
+    expect(installRes.ok).toBe(true);
+    expect(installRes.configPath).toContain('.cursor');
 
     const skRes = await (await postJson(base, '/api/skills/create', { name: 'api-helper', description: 'API helper skill', agent: 'deepseek' }, h)).json();
     expect(skRes.skills.some((s: any) => s.name === 'api-helper' && s.agent === 'deepseek')).toBe(true);

@@ -1,15 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createPatch, diffLines } from 'diff';
-import { describeAgent, normalizeAgent } from './agents';
+import { CATALOG_AGENTS, describeAgent, normalizeAgent } from './agents';
 import { readAgentPrefs } from './customization';
-import {
-  SUPPORTED_MEETING_AGENTS,
-  listMeetingFiles,
-  readMeetingFile,
-  saveMeetingMarkdown,
-  shuffleSeats,
-} from './meeting';
 import { normalizeFile } from './paths';
 import {
   ACTIONS,
@@ -33,17 +26,10 @@ import type {
   EventRow,
   EventType,
   LockRow,
-  MeetingFileInfo,
-  MeetingProposal,
-  MeetingState,
   ResearchRow,
   RoleRow,
   StateSnapshot,
 } from './types';
-
-const DEFAULT_ROLES: Array<[string, string]> = [
-  ['Çevirmen', 'Limiti en bol modeller (DeepSeek, Gemini CLI) ile prompttaki teknik terimleri koruyarak seçilen dile çevirir.'],
-];
 
 export interface SynergyOptions {
   root: string;
@@ -90,7 +76,6 @@ export class Synergy {
     this.lockTtlMs = opts.lockTtlMs ?? 10 * 60_000;
     this.maxEvents = opts.maxEvents ?? 5000;
     this.ensureDefaultChat();
-    this.seedDefaultRoles();
     this.prune();
   }
 
@@ -131,24 +116,6 @@ export class Synergy {
 
   activeChatId(): number {
     return this.ensureDefaultChat();
-  }
-
-  private seedDefaultRoles(): void {
-    const done = this.db.prepare("SELECT value FROM meta WHERE key='roles_v2_seeded'").get() as
-      | { value: string }
-      | undefined;
-    if (done?.value === '1') return;
-    const now = this.clock();
-    const hasTranslator = this.db.prepare("SELECT 1 FROM roles WHERE title='Çevirmen'").get();
-    if (!hasTranslator) {
-      // Remove legacy multi-role defaults if unassigned so fixed role becomes Çevirmen cleanly
-      this.db.prepare("DELETE FROM roles WHERE agent IS NULL").run();
-      const stmt = this.db.prepare('INSERT INTO roles(title,description,agent,ts) VALUES(?,?,NULL,?)');
-      for (const [title, description] of DEFAULT_ROLES) stmt.run(title, description, now);
-    }
-    this.db
-      .prepare("INSERT INTO meta(key,value) VALUES('roles_v2_seeded','1') ON CONFLICT(key) DO UPDATE SET value='1'")
-      .run();
   }
 
   // ---------- internals ----------
@@ -487,23 +454,6 @@ export class Synergy {
             /* ignore */
           }
         }
-        const mt = this.getMeeting();
-        let meetingHead = '';
-        if (mt && mt.status === 'active' && !mt.deafAgents.includes(agent)) {
-          const muted = mt.mutedAgents.includes(agent);
-          const hasFloor = mt.floorAgent === agent;
-          const recent = mt.messages
-            .slice(-4)
-            .map((m) => `  [${m.from}] ${m.text}`)
-            .join('\n');
-          meetingHead =
-            `MEETING ACTIVE: "${mt.title}" (discussion only — NO code edits/file locks during meeting)\n` +
-            `FLOOR: ${mt.floorAgent ?? 'none (use meeting_turn action=raise_hand to request permission)'}` +
-            (hasFloor ? ' — YOU HAVE THE FLOOR: call meeting_turn action=speak' : '') +
-            (muted ? ' — YOU ARE MUTED by human' : '') +
-            (recent ? `\nMEETING CHAT:\n${recent}` : '') +
-            '\n';
-        }
         let sourcesHead = '';
         try {
           const idxFile = path.join(this.root, '.synergy', 'sources.json');
@@ -523,7 +473,7 @@ export class Synergy {
         const ap = readAgentPrefs()[agent];
         if (ap?.behavior) prefHead += `AGENT BEHAVIOR: ${ap.behavior}\n`;
         if (ap?.message) prefHead += `USER DIRECTIVE TO YOU: ${ap.message}\n`;
-        return `${roleHead}${prefHead}${incogHead}${partHead}${sourcesHead}${meetingHead}${head}${feed}\n${formatLocks(this.activeLocks(), now)}`;
+        return `${roleHead}${prefHead}${incogHead}${partHead}${sourcesHead}${head}${feed}\n${formatLocks(this.activeLocks(), now)}`;
       })
       .immediate();
   }
@@ -569,7 +519,7 @@ export class Synergy {
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ')
       .slice(0, 60);
-    let pool: string[] = [...SUPPORTED_MEETING_AGENTS];
+    let pool: string[] = [...CATALOG_AGENTS];
     if (chat.participants) {
       try {
         const p = JSON.parse(chat.participants) as string[];
@@ -603,10 +553,6 @@ export class Synergy {
     if (slashMatch) {
       const cmd = slashMatch[1].toLowerCase();
       const rest = (slashMatch[2] ?? '').trim();
-      if (cmd === 'meeting') {
-        this.startMeeting({ startedBy: 'human', title: rest || undefined });
-        return { id: this.maxId() };
-      }
       if (cmd === 'newchat') {
         this.createChat(rest ? { title: rest } : undefined);
         return { id: this.maxId() };
@@ -1171,287 +1117,6 @@ export class Synergy {
     return this.db.prepare("SELECT * FROM research_requests WHERE status='pending' ORDER BY id").all() as ResearchRow[];
   }
 
-  // ---------- meeting room ("Toplantı Masası") ----------
-
-  getMeeting(): MeetingState | null {
-    const row = this.db.prepare("SELECT value FROM meta WHERE key='active_meeting'").get() as { value: string } | undefined;
-    if (!row?.value) return null;
-    try {
-      return JSON.parse(row.value) as MeetingState;
-    } catch {
-      return null;
-    }
-  }
-
-  private saveMeeting(mt: MeetingState | null): void {
-    if (!mt) {
-      this.db.prepare("DELETE FROM meta WHERE key='active_meeting'").run();
-    } else {
-      this.db
-        .prepare("INSERT INTO meta(key,value) VALUES('active_meeting',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-        .run(JSON.stringify(mt));
-    }
-    this.bumpChatRev();
-  }
-
-  getMeetingProposal(): MeetingProposal | null {
-    const row = this.db.prepare("SELECT value FROM meta WHERE key='meeting_proposal'").get() as { value: string } | undefined;
-    if (!row?.value) return null;
-    try {
-      return JSON.parse(row.value) as MeetingProposal;
-    } catch {
-      return null;
-    }
-  }
-
-  private saveMeetingProposal(p: MeetingProposal | null): void {
-    if (!p) {
-      this.db.prepare("DELETE FROM meta WHERE key='meeting_proposal'").run();
-    } else {
-      this.db
-        .prepare("INSERT INTO meta(key,value) VALUES('meeting_proposal',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-        .run(JSON.stringify(p));
-    }
-    this.bumpChatRev();
-  }
-
-  proposeMeeting(input: { by?: string; reason: string }): string {
-    const by = normalizeAgent(input.by);
-    const { text } = capWords(input.reason, 60);
-    if (!text) throw new Error('reason is empty');
-    return this.db
-      .transaction(() => {
-        this.ensureAgent(by);
-        const existing = this.getMeeting();
-        if (existing && existing.status === 'active') {
-          return `MEETING ALREADY ACTIVE: "${existing.title}"` + this.digest(by);
-        }
-        const proposal: MeetingProposal = { by, reason: text, ts: this.clock() };
-        this.saveMeetingProposal(proposal);
-        this.addEvent({ agent: by, type: 'system', to: 'human', text: `Meeting proposed: ${text}` });
-        return `PROPOSED meeting (${text}) awaiting human confirmation` + this.digest(by);
-      })
-      .immediate();
-  }
-
-  dismissMeetingProposal(): void {
-    this.saveMeetingProposal(null);
-  }
-
-  startMeeting(input?: { startedBy?: string; title?: string; connectedAgents?: string[] }): MeetingState {
-    const startedBy = input?.startedBy === 'human' ? 'human' : normalizeAgent(input?.startedBy ?? 'human');
-    const cleanTitle = (input?.title ?? '').trim().slice(0, 80);
-    const proposal = this.getMeetingProposal();
-    const title = cleanTitle || proposal?.reason?.slice(0, 80) || 'Team Strategy Meeting';
-    return this.db
-      .transaction(() => {
-        const current = this.getMeeting();
-        if (current && current.status === 'active') return current;
-        const now = this.clock();
-        const connected = input?.connectedAgents
-          ? [...new Set(input.connectedAgents.map((a) => normalizeAgent(a)).filter((a) => a !== 'human'))]
-          : (this.db.prepare("SELECT * FROM agents WHERE name!='human' ORDER BY first_seen").all() as AgentRow[])
-              .filter((a) => now - a.last_seen < IDLE_MS)
-              .map((a) => a.name);
-        const mt: MeetingState = {
-          id: `mtg-${now}`,
-          title,
-          startedBy,
-          startedAt: now,
-          status: 'active',
-          seats: shuffleSeats(connected),
-          floorAgent: null,
-          handsRaised: [],
-          mutedAgents: [],
-          deafAgents: [],
-          messages: [],
-          notes: [],
-        };
-        this.saveMeeting(mt);
-        this.saveMeetingProposal(null);
-        this.ensureAgent('human');
-        this.addEvent({ agent: startedBy, type: 'system', text: `Opened meeting table: ${title}` });
-        return mt;
-      })
-      .immediate();
-  }
-
-  private requireActiveMeeting(): MeetingState {
-    const mt = this.getMeeting();
-    if (!mt || mt.status !== 'active') throw new Error('no active meeting');
-    return mt;
-  }
-
-  meetingRaiseHand(input: { agent: string; reason?: string }): MeetingState {
-    const agent = normalizeAgent(input.agent);
-    const { text: reason } = capWords(input.reason ?? '', 25);
-    return this.db
-      .transaction(() => {
-        this.ensureAgent(agent);
-        const mt = this.requireActiveMeeting();
-        if (mt.deafAgents.includes(agent)) throw new Error('agent is not included in this meeting');
-        if (mt.mutedAgents.includes(agent)) throw new Error('agent is muted');
-        if (mt.floorAgent === agent) return mt;
-        const idx = mt.handsRaised.findIndex((h) => h.agent === agent);
-        const entry = { agent, reason: reason || undefined, ts: this.clock() };
-        if (idx >= 0) mt.handsRaised[idx] = entry;
-        else mt.handsRaised.push(entry);
-        this.saveMeeting(mt);
-        return mt;
-      })
-      .immediate();
-  }
-
-  meetingGrantFloor(agentRaw: string | null): MeetingState {
-    return this.db
-      .transaction(() => {
-        const mt = this.requireActiveMeeting();
-        if (!agentRaw) {
-          mt.floorAgent = null;
-          this.saveMeeting(mt);
-          return mt;
-        }
-        const agent = normalizeAgent(agentRaw);
-        if (mt.deafAgents.includes(agent)) throw new Error('agent is hidden from meeting');
-        if (mt.mutedAgents.includes(agent)) throw new Error('agent is muted');
-        mt.floorAgent = agent;
-        mt.handsRaised = mt.handsRaised.filter((h) => h.agent !== agent);
-        this.saveMeeting(mt);
-        return mt;
-      })
-      .immediate();
-  }
-
-  meetingSpeak(input: { from: string; text: string }): { meeting: MeetingState; messageId: number } {
-    const isHuman = input.from.trim().toLowerCase() === 'human';
-    const from = isHuman ? 'human' : normalizeAgent(input.from);
-    const { text } = capWords(input.text, 120);
-    if (!text) throw new Error('message is empty');
-    return this.db
-      .transaction(() => {
-        this.ensureAgent(from);
-        const mt = this.requireActiveMeeting();
-        if (!isHuman) {
-          if (mt.deafAgents.includes(from)) throw new Error('agent is excluded from meeting');
-          if (mt.mutedAgents.includes(from)) throw new Error('agent is muted');
-          if (mt.floorAgent !== from) {
-            throw new Error('you do not have the floor; raise hand first and wait for human permission');
-          }
-          mt.floorAgent = null;
-          mt.handsRaised = mt.handsRaised.filter((h) => h.agent !== from);
-        }
-        const messageId = (mt.messages[mt.messages.length - 1]?.id ?? 0) + 1;
-        mt.messages.push({ id: messageId, from, text, ts: this.clock() });
-        this.saveMeeting(mt);
-        return { meeting: mt, messageId };
-      })
-      .immediate();
-  }
-
-  meetingToggleMute(agentRaw: string, muted?: boolean): MeetingState {
-    const agent = normalizeAgent(agentRaw);
-    return this.db
-      .transaction(() => {
-        const mt = this.requireActiveMeeting();
-        const isMuted = mt.mutedAgents.includes(agent);
-        const next = muted !== undefined ? muted : !isMuted;
-        if (next && !isMuted) mt.mutedAgents.push(agent);
-        if (!next) mt.mutedAgents = mt.mutedAgents.filter((a) => a !== agent);
-        if (next) {
-          mt.handsRaised = mt.handsRaised.filter((h) => h.agent !== agent);
-          if (mt.floorAgent === agent) mt.floorAgent = null;
-        }
-        this.saveMeeting(mt);
-        return mt;
-      })
-      .immediate();
-  }
-
-  meetingToggleDeaf(agentRaw: string, deaf?: boolean): MeetingState {
-    const agent = normalizeAgent(agentRaw);
-    return this.db
-      .transaction(() => {
-        const mt = this.requireActiveMeeting();
-        const isDeaf = mt.deafAgents.includes(agent);
-        const next = deaf !== undefined ? deaf : !isDeaf;
-        if (next && !isDeaf) mt.deafAgents.push(agent);
-        if (!next) mt.deafAgents = mt.deafAgents.filter((a) => a !== agent);
-        if (next) {
-          mt.handsRaised = mt.handsRaised.filter((h) => h.agent !== agent);
-          if (mt.floorAgent === agent) mt.floorAgent = null;
-        }
-        this.saveMeeting(mt);
-        return mt;
-      })
-      .immediate();
-  }
-
-  meetingAcceptNote(messageId: number): MeetingState {
-    if (!Number.isInteger(messageId) || messageId <= 0) throw new Error('invalid message id');
-    return this.db
-      .transaction(() => {
-        const mt = this.requireActiveMeeting();
-        const msg = mt.messages.find((m) => m.id === messageId);
-        if (!msg) throw new Error('meeting message not found');
-        if (!msg.accepted) {
-          msg.accepted = true;
-          const noteId = (mt.notes[mt.notes.length - 1]?.id ?? 0) + 1;
-          mt.notes.push({ id: noteId, author: msg.from, text: msg.text, ts: this.clock() });
-        }
-        mt.savedFile = saveMeetingMarkdown(this.root, mt);
-        this.saveMeeting(mt);
-        return mt;
-      })
-      .immediate();
-  }
-
-  meetingAddNote(input: { author?: string; text: string }): MeetingState {
-    const author = input.author === 'human' || !input.author ? 'human' : normalizeAgent(input.author);
-    const { text } = capWords(input.text, 120);
-    if (!text) throw new Error('note is empty');
-    return this.db
-      .transaction(() => {
-        const mt = this.requireActiveMeeting();
-        const noteId = (mt.notes[mt.notes.length - 1]?.id ?? 0) + 1;
-        mt.notes.push({ id: noteId, author, text, ts: this.clock() });
-        mt.savedFile = saveMeetingMarkdown(this.root, mt);
-        this.saveMeeting(mt);
-        return mt;
-      })
-      .immediate();
-  }
-
-  endMeeting(): MeetingState | null {
-    return this.db
-      .transaction(() => {
-        const mt = this.getMeeting();
-        if (!mt) return null;
-        mt.status = 'ended';
-        mt.endedAt = this.clock();
-        mt.floorAgent = null;
-        mt.handsRaised = [];
-        if (mt.notes.length > 0 || mt.messages.length > 0) {
-          mt.savedFile = saveMeetingMarkdown(this.root, mt);
-        }
-        this.saveMeeting(null);
-        this.addEvent({
-          agent: 'human',
-          type: 'system',
-          text: `Ended meeting "${mt.title}"${mt.savedFile ? ` (notes: ${mt.savedFile})` : ''}`,
-        });
-        return mt;
-      })
-      .immediate();
-  }
-
-  listMeetingNotes(): MeetingFileInfo[] {
-    return listMeetingFiles(this.root);
-  }
-
-  readMeetingNote(file: string): string | null {
-    return readMeetingFile(this.root, file);
-  }
-
   // ---------- read side for the dashboard ----------
 
   state(): StateSnapshot {
@@ -1476,8 +1141,6 @@ export class Synergy {
       roles: this.listRoles(),
       chats: this.listChats(),
       activeChatId: this.activeChatId(),
-      meeting: this.getMeeting(),
-      meetingProposal: this.getMeetingProposal(),
       lastId: this.maxId(),
       now,
     };

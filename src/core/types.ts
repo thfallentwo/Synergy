@@ -144,57 +144,6 @@ export interface AgentPrefEntry {
 
 export type AgentPrefsMap = Record<string, AgentPrefEntry>;
 
-export interface MeetingMessage {
-  id: number;
-  from: string;
-  text: string;
-  ts: number;
-  accepted?: boolean;
-}
-
-export interface MeetingHand {
-  agent: string;
-  reason?: string;
-  ts: number;
-}
-
-export interface MeetingNote {
-  id: number;
-  author: string;
-  text: string;
-  ts: number;
-}
-
-export interface MeetingProposal {
-  by: string;
-  reason: string;
-  ts: number;
-}
-
-export interface MeetingState {
-  id: string;
-  title: string;
-  startedBy: string;
-  startedAt: number;
-  status: 'active' | 'ended';
-  endedAt?: number;
-  seats: string[];
-  floorAgent: string | null;
-  handsRaised: MeetingHand[];
-  mutedAgents: string[];
-  deafAgents: string[];
-  messages: MeetingMessage[];
-  notes: MeetingNote[];
-  savedFile?: string;
-}
-
-export interface MeetingFileInfo {
-  file: string;
-  title: string;
-  date: string;
-  mtime: number;
-}
-
 export interface ProjectMeta {
   name: string;
   dir: string;
@@ -243,8 +192,6 @@ export interface StateSnapshot {
   roles: RoleRow[];
   chats: ChatRow[];
   activeChatId: number;
-  meeting: MeetingState | null;
-  meetingProposal: MeetingProposal | null;
   lastId: number;
   now: number;
 }

@@ -4,7 +4,6 @@ import { getGitStatus } from '../src/core/git';
 import { resolveAgentLaunchTarget } from '../src/core/launcher';
 import { summarizeFinalText } from '../src/core/liveObserver';
 import { Synergy } from '../src/core/service';
-import { translatePrompt } from '../src/core/translate';
 import { addWorkflowAttachment, mutateWorkflowTask, readWorkflow, saveWorkflowPatch, stepWorkflowAutopilot } from '../src/core/workflow';
 import { openDb } from '../src/core/store';
 import { memSynergy, tmpRoot } from './helpers';
@@ -232,18 +231,13 @@ describe('commands & approvals', () => {
     expect(svc.recallLastHumanMessage()).toMatchObject({ ok: true, text: 'first' });
   });
 
-  it('seeds fixed Çevirmen role, assigns it to agents, and exposes role in readFeed', () => {
+  it('creates, assigns, exposes in readFeed, and deletes custom roles', () => {
     const { svc } = memSynergy();
-    const roles = svc.listRoles();
-    expect(roles.map((r) => r.title)).toEqual(['Çevirmen']);
-    const tr = roles[0];
-    svc.assignRole(tr.id, 'deepseek');
-    const feed = svc.readFeed({ agent: 'deepseek' });
-    expect(feed).toContain('ROLE: Çevirmen');
-
     const custom = svc.createRole({ title: 'Test Uzmanı', description: 'Sadece test yazar', agent: 'cursor' });
     expect(svc.state().agents.some((a) => a.name === 'cursor')).toBe(false);
     expect(svc.readFeed({ agent: 'cursor' })).toContain('ROLE: Test Uzmanı — Sadece test yazar');
+    svc.assignRole(custom.id, 'deepseek');
+    expect(svc.readFeed({ agent: 'deepseek' })).toContain('ROLE: Test Uzmanı');
     expect(svc.deleteRole(custom.id)).toBe(true);
   });
 
@@ -295,46 +289,6 @@ describe('commands & approvals', () => {
     expect(afterClear).toBeGreaterThan(beforeClear);
   });
 
-  it('runs the meeting table lifecycle with connected-only seats, mute/deaf isolation, and markdown notes', () => {
-    const root = tmpRoot();
-    const svc = new Synergy(openDb(':memory:'), { root });
-    svc.readFeed({ agent: 'claude' });
-    svc.readFeed({ agent: 'deepseek' });
-    svc.readFeed({ agent: 'codex' });
-    svc.humanSend('/meeting Memory Leak Bug');
-    const mt = svc.state().meeting!;
-    expect(mt.status).toBe('active');
-    expect(mt.title).toBe('Memory Leak Bug');
-    expect(mt.seats.slice().sort()).toEqual(['claude', 'codex', 'deepseek']);
-
-    svc.meetingToggleDeaf('codex', true);
-    expect(svc.readFeed({ agent: 'codex' })).not.toContain('MEETING ACTIVE');
-    expect(svc.readFeed({ agent: 'claude' })).toContain('MEETING ACTIVE');
-
-    svc.meetingRaiseHand({ agent: 'claude', reason: 'Reverse engineering' });
-    svc.meetingRaiseHand({ agent: 'deepseek', reason: 'Full scan' });
-    svc.meetingGrantFloor('deepseek');
-    const s1 = svc.meetingSpeak({ from: 'deepseek', text: 'Scan all files' });
-    expect(s1.meeting.floorAgent).toBeNull();
-
-    svc.meetingToggleMute('deepseek', true);
-    expect(() => svc.meetingRaiseHand({ agent: 'deepseek' })).toThrow(/muted/);
-
-    svc.meetingGrantFloor('claude');
-    const s2 = svc.meetingSpeak({ from: 'claude', text: 'Use reverse engineering first' });
-    const afterNote = svc.meetingAcceptNote(s2.messageId);
-    expect(afterNote.notes).toHaveLength(1);
-    expect(afterNote.savedFile).toBeTruthy();
-
-    const files = svc.listMeetingNotes();
-    expect(files).toHaveLength(1);
-    expect(svc.readMeetingNote(files[0].file)).toContain('Use reverse engineering first');
-
-    const ended = svc.endMeeting();
-    expect(ended?.status).toBe('ended');
-    expect(svc.state().meeting).toBeNull();
-  });
-
   it('compresses long live output to 2-3 summary lines', () => {
     const raw = '# Title\n\nLine one summary.\nLine two summary.\n```ts\nconst huge = 1;\n```\nLine three.\nLine four ignored.\nLine five ignored.';
     const out = summarizeFinalText(raw);
@@ -370,19 +324,6 @@ describe('commands & approvals', () => {
     // 24 hours later -> incognito chat disappears automatically
     clock.advance(24 * 60 * 60_000 + 1);
     expect(svc.listChats().some((c) => c.id === incog.id)).toBe(false);
-  });
-
-  it('translates prompt prose while preserving @mentions, /commands, code, and tech terms', async () => {
-    const fakeFetch = (async (url: string | URL | Request) => {
-      expect(String(url)).toContain('translate.googleapis.com');
-      return {
-        ok: true,
-        json: async () => [[['__AGORA_T0__ __AGORA_T1__ please fix __AGORA_T2__ in __AGORA_T3__', 'src']]],
-      } as unknown as Response;
-    }) as typeof fetch;
-
-    const out = await translatePrompt('@claude /goal düzelt API içinde src/auth.ts', 'en', tmpRoot(), fakeFetch);
-    expect(out.translated).toBe('@claude /goal please fix API in src/auth.ts');
   });
 
   it('creates custom skills with 20-char name limit and inspects git status safely', () => {

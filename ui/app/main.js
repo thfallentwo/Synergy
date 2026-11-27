@@ -1013,6 +1013,14 @@ function wireEvents() {
         return;
       }
 
+      const installMcp = t.closest('[data-install-mcp]');
+      if (installMcp) {
+        const client = installMcp.dataset.installMcp;
+        const res = await apiPost('/api/mcp/install', { client });
+        showToast(`MCP yazıldı: ${res.configPath}`);
+        return;
+      }
+
       const openAg = t.closest('[data-open-agent]');
       if (openAg) {
         const res = await apiPost('/api/agent/open', { agent: openAg.dataset.openAgent });

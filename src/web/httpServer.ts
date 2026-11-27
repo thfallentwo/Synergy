@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import {
   getAgentCatalog,
@@ -9,8 +10,6 @@ import {
   hasAgentApiKey,
   hasAgentCli,
   hasReadyAgentCli,
-  runAgentApiCall,
-  runAgentCliCall,
   runAgentUnified,
   setupAgentCli,
 } from '../core/apiRunner';
@@ -46,7 +45,6 @@ import { dbPath, normalizeFile } from '../core/paths';
 import { perplexityKeyStatus, queryPerplexityApi, readPerplexityKey, savePerplexityKey } from '../core/perplexity';
 import { Synergy } from '../core/service';
 import { openDb } from '../core/store';
-import { translatePrompt } from '../core/translate';
 import { listProjectFiles } from '../core/tree';
 import type { AgentView, CommandRow, ProjectMeta, StateSnapshot, UsageItem } from '../core/types';
 import { collectUsageWindow } from '../core/usage';
@@ -260,20 +258,6 @@ export async function startUiServer(svc: Synergy, opts: UiOptions): Promise<UiSe
       p: state.pausedAgents,
       ro: state.roles.map((r) => [r.id, r.title, r.agent]),
       ch: [state.activeChatId, state.chats.map((c) => [c.id, c.title, c.archived, c.cleared_at, c.incognito, c.named_by, c.pinned, c.live_sessions])],
-      mt: state.meeting
-        ? [
-            state.meeting.id,
-            state.meeting.status,
-            state.meeting.floorAgent,
-            state.meeting.handsRaised.length,
-            state.meeting.mutedAgents,
-            state.meeting.deafAgents,
-            state.meeting.messages.length,
-            state.meeting.notes.length,
-            state.meeting.savedFile,
-          ]
-        : null,
-      mp: state.meetingProposal ? [state.meetingProposal.by, state.meetingProposal.ts] : null,
       pr: projectRev,
     });
     return { state, sig };
@@ -490,13 +474,6 @@ export async function startUiServer(svc: Synergy, opts: UiOptions): Promise<UiSe
       return json(res, 200, { path: rel, content: fs.readFileSync(abs, 'utf8').slice(0, 200_000) });
     }
     if (p === '/api/diff') return json(res, 200, { diffs: activeSvc.diffsForFile(url.searchParams.get('file') ?? '', 5) });
-    if (p === '/api/meeting/notes') {
-      const file = url.searchParams.get('file');
-      if (!file) return json(res, 200, { files: activeSvc.listMeetingNotes() });
-      const content = activeSvc.readMeetingNote(file);
-      if (!content) return json(res, 404, { error: 'meeting note not found' });
-      return json(res, 200, { file: path.basename(file), content });
-    }
     json(res, 404, { error: 'not found' });
   }
 
@@ -586,13 +563,6 @@ export async function startUiServer(svc: Synergy, opts: UiOptions): Promise<UiSe
     }
     if (p === '/api/message') {
       const text = String(body.text ?? '');
-      const mCmd = text.trim().match(/^\/meeting(?:\s+([\s\S]+))?$/i);
-      if (mCmd) {
-        const prefs = readAgentPrefs();
-        const connectedAgents = mergedState().agents.filter((a) => a.status !== 'offline' && !prefs[a.name]?.disabled).map((a) => a.name);
-        activeSvc.startMeeting({ startedBy: 'human', title: mCmd[1]?.trim() || undefined, connectedAgents });
-        return json(res, 200, { id: activeSvc.maxId() });
-      }
       const sent = activeSvc.humanSend(text, body.image ? String(body.image) : null);
       const ev = activeSvc.recentEvents(1)[0];
       let notice: string | undefined;
@@ -779,46 +749,37 @@ export async function startUiServer(svc: Synergy, opts: UiOptions): Promise<UiSe
     }
     if (p === '/api/roles/assign') return json(res, 200, activeSvc.assignRole(Number(body.id), body.agent ? String(body.agent) : null));
     if (p === '/api/roles/delete') return json(res, 200, { deleted: activeSvc.deleteRole(Number(body.id)) });
-    if (p === '/api/translate') {
-      return json(res, 200, await translatePrompt(String(body.text ?? ''), body.targetLang ? String(body.targetLang) : 'en', activeSvc.root));
-    }
-    if (p === '/api/meeting/start') {
-      const prefs = readAgentPrefs();
-      const connectedAgents = mergedState().agents.filter((a) => a.status !== 'offline' && !prefs[a.name]?.disabled).map((a) => a.name);
-      return json(res, 200, activeSvc.startMeeting({ startedBy: 'human', title: body.title ? String(body.title) : undefined, connectedAgents }));
-    }
-    if (p === '/api/meeting/dismiss-proposal') {
-      activeSvc.dismissMeetingProposal();
-      return json(res, 200, { ok: true });
-    }
-    if (p === '/api/meeting/speak') return json(res, 200, activeSvc.meetingSpeak({ from: body.from ? String(body.from) : 'human', text: String(body.text ?? '') }));
-    if (p === '/api/meeting/raise-hand') {
-      return json(res, 200, activeSvc.meetingRaiseHand({ agent: String(body.agent ?? ''), reason: body.reason ? String(body.reason) : undefined }));
-    }
-    if (p === '/api/meeting/grant') {
-      const mt = activeSvc.meetingGrantFloor(body.agent ? String(body.agent) : null);
-      if (mt.floorAgent && (hasAgentApiKey(activeSvc.root, mt.floorAgent) || hasReadyAgentCli(mt.floorAgent))) {
-        const ag = mt.floorAgent;
-        const ctx = `Meeting topic: ${mt.title}\nRecent discussion:\n` + mt.messages.slice(-5).map((m) => `${m.from}: ${m.text}`).join('\n');
-        const mtSys = 'You are in the Masiva Labs meeting table (no code edits). Give one short constructive suggestion in 1-2 sentences.';
-        const mtRunner = hasAgentApiKey(activeSvc.root, ag)
-          ? runAgentApiCall(activeSvc.root, ag, ctx, mtSys)
-          : runAgentCliCall(activeSvc.root, ag, ctx, mtSys);
-        mtRunner.then((ans) => { if (ans && activeSvc.getMeeting()?.floorAgent === ag) activeSvc.meetingSpeak({ from: ag, text: ans }); }).catch(() => {});
+    if (p === '/api/mcp/install') {
+      const client = String(body.client ?? '').trim().toLowerCase();
+      if (client !== 'antigravity' && client !== 'cursor') {
+        return json(res, 400, { error: 'desteklenen istemci: antigravity veya cursor' });
       }
-      return json(res, 200, mt);
+      const configPath =
+        client === 'antigravity'
+          ? path.join(os.homedir(), '.gemini', 'antigravity', 'mcp_config.json')
+          : path.join(activeSvc.root, '.cursor', 'mcp.json');
+      let cur: Record<string, any> = {};
+      try {
+        if (fs.existsSync(configPath)) {
+          const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (parsed && typeof parsed === 'object') cur = parsed as Record<string, any>;
+        }
+      } catch {
+        cur = {};
+      }
+      const prevServers = cur.mcpServers && typeof cur.mcpServers === 'object' ? cur.mcpServers : {};
+      cur.mcpServers = {
+        ...prevServers,
+        synergy: {
+          command: 'npx',
+          args: ['-y', 'synergy-mcp', 'serve', '--root', activeSvc.root],
+          env: { SYNERGY_AGENT: client },
+        },
+      };
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify(cur, null, 2) + '\n', 'utf8');
+      return json(res, 200, { ok: true, client, configPath });
     }
-    if (p === '/api/meeting/mute') {
-      return json(res, 200, activeSvc.meetingToggleMute(String(body.agent ?? ''), body.muted !== undefined ? Boolean(body.muted) : undefined));
-    }
-    if (p === '/api/meeting/deaf') {
-      return json(res, 200, activeSvc.meetingToggleDeaf(String(body.agent ?? ''), body.deaf !== undefined ? Boolean(body.deaf) : undefined));
-    }
-    if (p === '/api/meeting/accept-note') {
-      if (body.text) return json(res, 200, activeSvc.meetingAddNote({ author: body.author ? String(body.author) : 'human', text: String(body.text) }));
-      return json(res, 200, activeSvc.meetingAcceptNote(Number(body.messageId)));
-    }
-    if (p === '/api/meeting/end') return json(res, 200, { ended: activeSvc.endMeeting() });
     if (p === '/api/git/remote') return json(res, 200, setGitRemote(activeSvc.root, String(body.url ?? '')));
     if (p === '/api/git/auth') {
       saveGitHubAuth({
