@@ -1,11 +1,13 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
+import { Synergy } from '../src/core/service';
+import { openDb } from '../src/core/store';
 import { createMcpServer } from '../src/mcp/server';
-import { memSynergy } from './helpers';
+import { memSynergy, tmpRoot } from './helpers';
 
-async function connect(defaultAgent?: string) {
-  const { svc } = memSynergy();
+async function connect(defaultAgent?: string, root?: string) {
+  const svc = root ? new Synergy(openDb(':memory:'), { root }) : memSynergy().svc;
   const { server, releaseAll } = createMcpServer(svc, { defaultAgent });
   const [ct, st] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 't', version: '1' });
@@ -18,10 +20,21 @@ async function connect(defaultAgent?: string) {
 }
 
 describe('MCP tools', () => {
-  it('exposes exactly the five tools with tiny descriptions', async () => {
+  it('exposes the ten tools with tiny descriptions', async () => {
     const { client } = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['ask_agent', 'lock_file', 'post_status', 'read_feed', 'unlock_file']);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      'ask_agent',
+      'ask_perplexity',
+      'create_skill',
+      'get_project_memory',
+      'handoff_task',
+      'lock_file',
+      'post_status',
+      'read_feed',
+      'send_command',
+      'unlock_file',
+    ]);
     for (const t of tools) expect((t.description ?? '').length).toBeLessThan(120);
   });
 
@@ -52,5 +65,47 @@ describe('MCP tools', () => {
     await call('lock_file', { file: 'a.ts' });
     releaseAll();
     expect(svc.state().locks).toHaveLength(0);
+  });
+
+  it('send_command queues a pending command for human approval', async () => {
+    const { call, svc } = await connect('cursor');
+    const r = await call('send_command', { to: 'claude', command: 'Run unit tests on auth.ts' });
+    expect(r.err).toBe(false);
+    expect(r.text).toMatch(/^PENDING cmd#1 awaiting human approval/);
+    expect(svc.state().pendingCommands).toHaveLength(1);
+  });
+
+  it('ask_perplexity opens a pending research request when no API key is set', async () => {
+    const prev = process.env.PERPLEXITY_API_KEY;
+    delete process.env.PERPLEXITY_API_KEY;
+    try {
+      const { call, svc } = await connect('codex');
+      const r = await call('ask_perplexity', { query: 'Report copyright rules for brand X' });
+      expect(r.err).toBe(false);
+      expect(r.text).toMatch(/^PENDING research#1/);
+      expect(svc.state().pendingResearch).toHaveLength(1);
+    } finally {
+      if (prev !== undefined) process.env.PERPLEXITY_API_KEY = prev;
+    }
+  });
+
+  it('get_project_memory and handoff_task share context and persist handoff records', async () => {
+    const root = tmpRoot();
+    const { call, svc } = await connect('antigravity', root);
+    await call('lock_file', { file: 'src/auth.ts' });
+    const h = await call('handoff_task', {
+      to: 'codex',
+      goal: 'Add refresh token rotation',
+      files: ['src/auth.ts'],
+      notes: 'Keep backwards compatibility with existing cookie header',
+    });
+    expect(h.err).toBe(false);
+    expect(h.text).toMatch(/^OK #2/);
+
+    const mem = await call('get_project_memory', { include_diff: false });
+    expect(mem.err).toBe(false);
+    expect(mem.text).toContain('LAST HANDOFF:');
+    expect(mem.text).toContain('antigravity -> codex: Add refresh token rotation');
+    expect(svc.readFeed({ agent: 'codex' })).toContain('[HANDOFF] Add refresh token rotation');
   });
 });

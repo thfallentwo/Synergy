@@ -36,7 +36,7 @@ describe('real stdio server', () => {
     await waitFor(1);
     send({ jsonrpc: '2.0', method: 'notifications/initialized' });
     send({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-    expect((await waitFor(2)).result.tools).toHaveLength(5);
+    expect((await waitFor(2)).result.tools).toHaveLength(10);
     send({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'lock_file', arguments: { file: 'a.ts' } } });
     expect((await waitFor(3)).result.content[0].text).toMatch(/^OK a\.ts locked/);
 

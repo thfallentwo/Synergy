@@ -4,14 +4,41 @@ const KINDS: Array<[RegExp, string]> = [
   [/cursor/i, 'cursor'],
   [/gemini/i, 'gemini'],
   [/antigravity/i, 'antigravity'],
+  [/^openai$/i, 'openai'],
   [/codex|openai|chatgpt/i, 'codex'],
   [/kimi|moonshot/i, 'kimi'],
   [/hermes/i, 'hermes'],
   [/grok/i, 'grok'],
+  [/perplexity/i, 'perplexity'],
+  [/deepseek/i, 'deepseek'],
+  [/nemotron|nvidia/i, 'nemotron'],
   [/copilot/i, 'copilot'],
-  [/windsurf/i, 'windsurf'],
+  [/ollama/i, 'ollama'],
   [/^(human|you|user|dev|developer)$/i, 'human'],
 ];
+
+/** IDE-based agents connected over pull-based MCP stdio rather than headless prompt runners. */
+export const MCP_IDE_AGENTS = new Set(['antigravity', 'cursor', 'claude-code', 'copilot']);
+
+export type AgentCapability = 'runnable' | 'mcp_ide' | 'unconfigured';
+
+/** Canonical catalog order exposed to UI and orchestration endpoints (no ghost placeholders). */
+export const CATALOG_AGENTS = [
+  'codex',
+  'claude',
+  'gemini',
+  'openai',
+  'deepseek',
+  'perplexity',
+  'grok',
+  'kimi',
+  'nemotron',
+  'ollama',
+  'antigravity',
+  'cursor',
+  'claude-code',
+  'copilot',
+] as const;
 
 /** Normalize free-form agent names ("Claude Code", "CLAUDE") to one stable key. */
 export function normalizeAgent(raw: string | undefined | null): string {
@@ -33,11 +60,14 @@ const PRETTY: Record<string, string> = {
   gemini: 'Gemini CLI',
   antigravity: 'Antigravity',
   codex: 'Codex',
+  openai: 'OpenAI (GPT)',
   copilot: 'Copilot',
   kimi: 'Kimi',
-  hermes: 'Hermes Agent',
-  grok: 'Grok Bot',
-  windsurf: 'Windsurf',
+  grok: 'Grok',
+  perplexity: 'Perplexity',
+  deepseek: 'DeepSeek',
+  nemotron: 'NVIDIA Nemotron',
+  ollama: 'Ollama (Local)',
   human: '[Human]',
 };
 

@@ -1,11 +1,13 @@
 {
   "name": "synergy-mcp",
   "version": "0.1.0",
-  "description": "A local-first 'group chat' for AI coding agents: ultra-low-token MCP server + live dashboard to avoid file conflicts.",
+  "description": "Masiva Labs (synergy-mcp): local multi-agent coding orchestrator + ultra-low-token MCP server with shared project memory and file locks.",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "synergy": "dist/cli/index.js"
+    "masiva": "dist/cli/index.js",
+    "synergy": "dist/cli/index.js",
+    "agora": "dist/cli/index.js"
   },
   "files": [
     "dist",

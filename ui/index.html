@@ -1,376 +1,237 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr" data-theme="dark" data-accent="sapphire" data-font="inter">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="synergy-token" content="__SYNERGY_TOKEN__">
-<title>Synergy</title>
-<style>
-:root{--bg:#0d1016;--panel:#10141c;--line:#222836;--ink:#e6e9ef;--mut:#8b93a5;--acc:#7c9cff;--add:#aff5b4;--del:#ffb3ae}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.m,.code{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-#app{height:100%;display:flex;flex-direction:column;min-height:560px}
-header{height:52px;flex:none;display:flex;align-items:center;gap:16px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line)}
-header strong{font-size:16px}
-.mut{color:var(--mut)}
-.sp{flex:1}
-.live{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
-.dot{width:8px;height:8px;border-radius:50%;flex:none;background:#566074}
-.dot.working{background:#3fb950}.dot.idle{background:#d4a72c}.dot.offline{background:#566074}
-select,input,button{font:inherit;color:var(--ink)}
-select,.btn{background:#1e2533;border:1px solid #2b3345;border-radius:6px;padding:6px 10px;min-height:32px;cursor:pointer;font-size:12px;font-weight:500}
-.btn:hover,select:hover{background:#252d3f}
-.btn:focus-visible,select:focus-visible,input:focus-visible,.tab:focus-visible,.leaf:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
-.cols{flex:1;display:flex;min-height:0}
-aside{flex:none;background:var(--panel);overflow:auto}
-#left{width:250px;border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:24px}
-#right{width:320px;border-left:1px solid var(--line);padding:16px 14px;display:flex;flex-direction:column;gap:12px}
-h2{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:600}
-.leaf{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:13px;color:#c5cad6;cursor:default;min-height:28px}
-button.leaf{width:100%;background:none;border:0;text-align:left;cursor:pointer}
-.leaf:hover{background:#171d29}.leaf.on{background:#1e2533;color:#fff}
-.leaf .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.leaf .tag{margin-left:auto;font-size:10px;white-space:nowrap}
-main{flex:1;min-width:0;display:flex;flex-direction:column}
-.tabs{display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--line);gap:0}
-.tab{background:none;border:0;border-bottom:2px solid transparent;padding:12px 14px;color:var(--mut);font-size:13px;font-weight:500;cursor:pointer}
-.tab.on{color:#fff;border-bottom-color:var(--acc)}
-.tabs .btn{margin-left:8px}
-.pane{flex:1.1;min-height:0;overflow:auto;border-bottom:1px solid var(--line);padding:14px 0}
-main[data-tab=chat] .pane{display:none}
-main:not([data-tab=code]) #pane-code{display:none}
-main:not([data-tab=control]) #pane-control{display:none}
-#diffhead{padding:0 20px 10px;font-size:12px;color:var(--mut);display:flex;gap:10px;flex-wrap:wrap}
-.ln{display:flex;font-size:13px;line-height:22px;white-space:pre;color:#aab2c3}
-.ln i{width:46px;flex:none;text-align:right;padding-right:10px;color:#566074;font-style:normal}
-.ln b{width:16px;flex:none;font-weight:400}
-.ln.a{background:rgba(63,185,80,.14);color:var(--add)}.ln.d{background:rgba(248,81,73,.14);color:var(--del)}
-.ln.h{color:#7aa2ff;background:#141b2b}
-.dh{padding:10px 20px 4px;font-size:12px;color:var(--mut)}
-.ctl{padding:0 20px;display:flex;flex-direction:column;gap:16px}
-table{border-collapse:collapse;width:100%;font-size:13px}
-td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
-th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-#chatwrap{flex:1;min-height:0;display:flex;flex-direction:column}
-#chat{flex:1;min-height:0;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
-.bub{max-width:72%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.45;background:var(--bg2,#1d2230);border:1px solid var(--bd,#3a4258);align-self:flex-start;overflow-wrap:anywhere}
-.bub.me{align-self:flex-end}
-.bub .who{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--ac,#c5cad6);margin-bottom:3px}
-.bub .who img,.bub .who .mono{width:16px;height:16px}
-.bub .who .t{margin-left:auto;padding-left:12px;font-weight:400;color:var(--mut)}
-.chip{font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.1);margin-right:6px}
-.alert{align-self:center;font-size:11px;color:var(--mut);background:#171c27;border-radius:99px;padding:4px 12px;max-width:90%;overflow-wrap:anywhere;text-align:center}
-#send{display:flex;gap:10px;padding:12px 20px;border-top:1px solid var(--line)}
-#send input{flex:1;background:#151a24;border:1px solid #2b3345;border-radius:8px;padding:10px 14px;font-size:13px;min-height:40px}
-#send button{background:var(--acc);color:#0d1016;border-color:var(--acc);font-weight:600;padding:0 18px}
-#err{color:var(--del);font-size:12px;padding:0 20px 6px;min-height:0}
-.card{border-radius:12px;padding:12px;border:1px solid;display:flex;flex-direction:column;gap:8px}
-.card.g{background:#143a26;border-color:#2f8f4e}.card.r{background:#451c22;border-color:#b5424a}.card.n{background:#1a2030;border-color:#323b50}
-.card.off{opacity:.7}
-.card .top{display:flex;align-items:center;gap:12px}
-.card .nm{font-weight:600;font-size:15px;color:var(--ac,#e6e9ef)}
-.card .st{font-size:11px;color:#c5cad6}
-.net{margin-left:auto;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.12);white-space:nowrap}
-.cnts{display:flex;gap:20px}.cnt{font-size:15px;font-weight:600}.cnt.a{color:var(--add)}.cnt.d{color:var(--del)}
-.sum{margin:0;font-size:12.5px;line-height:1.45;color:#d6dbe6;overflow-wrap:anywhere}
-.file{font-size:11px;color:var(--mut);overflow-wrap:anywhere}
-.av{width:44px;height:44px;object-fit:contain;flex:none}
-.mono{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#2b3345;font-weight:700;color:#fff;flex:none}
-.av.mono{font-size:18px}
-.dots span{display:inline-block;animation:bl 1.2s infinite;opacity:.2}
-.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
-@keyframes bl{0%,100%{opacity:.2}50%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.dots span{animation:none;opacity:.8}}
-.empty{color:var(--mut);font-size:13px;margin:0}
-[data-kind=claude],[data-kind=claude-code]{--ac:#f0a483;--bg2:#3a2418;--bd:#6b4129}
-[data-kind=antigravity]{--ac:#8ec5ff;--bg2:#16233f;--bd:#2c4478}
-[data-kind=gemini]{--ac:#a9c4ff;--bg2:#17233d;--bd:#33497a}
-[data-kind=cursor]{--ac:#d0d4dc;--bg2:#222733;--bd:#3d4559}
-[data-kind=codex]{--ac:#e6e9ef;--bg2:#1f2630;--bd:#3a4553}
-[data-kind=copilot]{--ac:#d9a8ff;--bg2:#2a1f3d;--bd:#58427f}
-[data-kind=hermes]{--ac:#e6c98a;--bg2:#2b2518;--bd:#5e5230}
-[data-kind=grok]{--ac:#e6e9ef;--bg2:#1c1f26;--bd:#3b4150}
-[data-kind=kimi]{--ac:#8bbcff;--bg2:#162136;--bd:#2f4a73}
-[data-kind=human]{--ac:#e6e9ef;--bg2:#1d2230;--bd:#3a4258}
-@media (max-width:900px){.cols{flex-direction:column;overflow:auto}#left,#right{width:auto;border:0}main{min-height:600px}}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Masiva Labs</title>
+  <link rel="stylesheet" href="/styles/base.css" />
+  <link rel="stylesheet" href="/styles/app.css" />
+  <meta name="synergy-token" content="__SYNERGY_TOKEN__" />
 </head>
 <body>
-<div id="app">
-  <header>
-    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="9" cy="13" r="7" fill="none" stroke="#7c9cff" stroke-width="2.5"/><circle cx="17" cy="13" r="7" fill="none" stroke="#e8a06a" stroke-width="2.5"/></svg>
-    <strong>Synergy</strong>
-    <span class="mut" id="proj"></span>
-    <span class="sp"></span>
-    <span class="live" role="status"><span class="dot" id="livedot"></span><span id="livetxt">Connecting…</span></span>
-    <label class="mut" style="font-size:12px" for="lang">Summary language</label>
-    <select id="lang"></select>
-  </header>
-  <div class="cols">
-    <aside id="left">
-      <section><h2>Explorer</h2><div id="tree"></div></section>
-      <section><h2>Connections</h2><div id="conns"></div></section>
-    </aside>
-    <main data-tab="code" id="main">
-      <div class="tabs" role="tablist">
-        <button class="tab on" role="tab" data-tab="code" type="button">Code preview</button>
-        <button class="tab" role="tab" data-tab="chat" type="button">Agent chat</button>
-        <button class="tab" role="tab" data-tab="control" type="button">Control panel</button>
-        <span class="sp"></span>
-        <button class="btn" id="pause" type="button">Pause all</button>
-        <button class="btn" id="forcebtn" type="button">Force unlock</button>
-      </div>
-      <section class="pane" id="pane-code"><div id="diffhead"></div><div id="diff"></div></section>
-      <section class="pane" id="pane-control"><div class="ctl" id="ctl"></div></section>
-      <section id="chatwrap">
-        <div id="chat" aria-live="polite"></div>
-        <div id="err" role="alert"></div>
-        <form id="send" autocomplete="off">
-          <label for="msg" style="position:absolute;left:-9999px">Message to the group</label>
-          <input id="msg" placeholder="Message the group, @agent text, /lock file, /unlock file" maxlength="500">
-          <button class="btn" type="submit">Send</button>
-        </form>
-      </section>
-    </main>
-    <aside id="right"><h2 id="agents-title">Agents</h2><div id="agents" style="display:flex;flex-direction:column;gap:12px"></div></aside>
+  <div class="ambient-bg" aria-hidden="true">
+    <div class="ambient-aurora"></div>
+    <div class="ambient-dots"></div>
   </div>
-</div>
-<script>
-(() => {
-const $ = (s) => document.querySelector(s);
-const TOKEN = $('meta[name=synergy-token]').content;
-const ICONS = new Set(['claude','claude-code','antigravity','codex','gemini','copilot','cursor','kimi','hermes','grok']);
-const LANGS = [['en','English'],['tr','Türkçe'],['de','Deutsch'],['es','Español'],['fr','Français'],['pt','Português'],['ru','Русский'],['ja','日本語'],['zh','中文']];
-const S = { agents: [], locks: [], events: [], diffs: [], tree: [], lang: 'en', project: '', selected: null, pinned: false, tab: 'code', follow: true, diffData: null, collapsed: new Set() };
 
-function el(tag, cls, ...kids) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  for (const k of kids) { if (k == null || k === false) continue; e.append(k.nodeType ? k : document.createTextNode(String(k))); }
-  return e;
-}
-const nf = (n) => { try { return Number(n).toLocaleString(S.lang); } catch { return String(n); } };
-const hhmm = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-const age = (ts) => { const s = Math.max(0, Math.floor((Date.now() - ts) / 1000)); if (s < 60) return s + 's'; const m = Math.floor(s / 60); if (m < 60) return m + 'm'; const h = Math.floor(m / 60); return h < 24 ? h + 'h' : Math.floor(h / 24) + 'd'; };
-const agentOf = (n) => S.agents.find((a) => a.name === n);
-const kindOf = (n) => (n === 'human' ? 'human' : agentOf(n)?.kind ?? n);
-const nameOf = (n) => (n === 'human' ? '[Human]' : agentOf(n)?.display ?? n);
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Ana menü">
+      <div class="sidebar-head">
+        <div class="sidebar-brand" title="Masiva Labs">
+          <svg class="brand-dots" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+            <circle cx="5.5" cy="6.5" r="2.1" />
+            <circle cx="5.5" cy="12" r="2.1" />
+            <circle cx="5.5" cy="17.5" r="2.1" />
+            <circle cx="12" cy="10.2" r="2.2" />
+            <circle cx="18.5" cy="6.5" r="2.1" />
+            <circle cx="18.5" cy="12" r="2.1" />
+            <circle cx="18.5" cy="17.5" r="2.1" />
+          </svg>
+          <span class="sidebar-label">Masiva Labs</span>
+        </div>
+        <button type="button" id="btn-sidebar-toggle" class="sidebar-toggle" title="Menüyü Genişlet / Daralt" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3" />
+            <path d="M9 4v16" />
+          </svg>
+        </button>
+      </div>
 
-function avatar(kind, name, cls) {
-  if (ICONS.has(kind)) { const i = el('img', cls); i.src = '/icons/' + kind + '.png'; i.alt = ''; return i; }
-  return el('span', 'mono ' + cls, (name || '?').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase() || '?');
-}
-const put = (p, ...kids) => { for (const k of kids) { if (k == null || k === false) continue; p.append(k); } return p; };
-const dots = () => el('span', 'dots', el('span', null, '.'), el('span', null, '.'), el('span', null, '.'));
+      <button type="button" id="btn-new-chat" class="sidebar-new-chat" title="Yeni Sohbet">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        <span class="sidebar-label">Yeni Sohbet</span>
+      </button>
 
-async function post(path, body) {
-  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Synergy-Token': TOKEN }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
-  return j;
-}
-const showErr = (e) => { $('#err').textContent = e ? String(e.message || e) : ''; if (e) setTimeout(() => ($('#err').textContent = ''), 5000); };
+      <nav class="sidebar-nav" aria-label="Görünümler">
+        <button type="button" class="sidebar-nav-btn" data-view="agents" title="Agents">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="6" cy="6" r="2.5" />
+            <circle cx="18" cy="6" r="2.5" />
+            <circle cx="12" cy="18" r="2.5" />
+            <path d="M8 7.5 11 16m5-8.5L13 16M8.5 6h7" />
+          </svg>
+          <span class="sidebar-label">Agents</span>
+        </button>
+        <button type="button" class="sidebar-nav-btn" data-view="customization" title="Customization">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3a9 9 0 1 0 9 9c0-1.1-.9-2-2-2h-1.8a1.5 1.5 0 0 1-1.4-2.1L16.5 6A4.5 4.5 0 0 0 12 3Z" />
+            <circle cx="7.5" cy="11.5" r="1" fill="currentColor" />
+            <circle cx="10" cy="7.5" r="1" fill="currentColor" />
+            <circle cx="14.5" cy="7.5" r="1" fill="currentColor" />
+          </svg>
+          <span class="sidebar-label">Customization</span>
+        </button>
+        <button type="button" class="sidebar-nav-btn" data-view="canvas" title="Canvas">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="14" rx="2.5" />
+            <path d="M8 21h8M12 18v3M7 13l3-3 3 2.5 4-4.5" />
+          </svg>
+          <span class="sidebar-label">Canvas</span>
+        </button>
+      </nav>
 
-function renderTop() {
-  $('#proj').textContent = S.project ? S.project + ' · local' : '';
-  const w = S.agents.filter((a) => a.status === 'working').length;
-  $('#livetxt').textContent = 'Live · ' + w + ' agent' + (w === 1 ? '' : 's') + ' working';
-  $('#livedot').className = 'dot working';
-  const sel = $('#lang'); if (sel.value !== S.lang) sel.value = S.lang;
-}
+      <div class="sidebar-scroll">
+        <section class="sidebar-section">
+          <div class="sidebar-section-head">
+            <span class="sidebar-label">Projects</span>
+            <button type="button" id="btn-new-project" class="sidebar-mini-btn" title="Yeni Proje / Klasör Aç">+</button>
+          </div>
+          <div id="sidebar-projects" class="sidebar-list"></div>
+        </section>
 
-function renderAgents() {
-  const root = $('#agents'); root.replaceChildren();
-  $('#agents-title').textContent = 'Agents · ' + S.agents.length;
-  if (!S.agents.length) root.append(el('p', 'empty', 'No agents yet. They appear here as soon as they call a Synergy tool.'));
-  for (const a of S.agents) {
-    const tone = a.added > a.removed ? 'g' : a.removed > a.added ? 'r' : 'n';
-    const net = a.added - a.removed;
-    const working = a.status === 'working';
-    const card = el('div', 'card ' + tone + (a.status === 'offline' ? ' off' : ''));
-    card.dataset.kind = a.kind;
-    const st = el('div', 'st');
-    if (working) st.append('working', dots()); else st.append(a.status === 'idle' ? 'idle · ' + age(a.last_seen) : 'offline');
-    put(card,
-      el('div', 'top', avatar(a.kind, a.display, 'av'), el('div', null, el('div', 'nm', a.display), st), el('span', 'net', 'NET ' + (net > 0 ? '+' : net < 0 ? '\u2212' : '') + nf(Math.abs(net)))),
-      el('div', 'cnts',
-        el('div', 'cnt a', '+ ' + nf(a.added), working && dots()),
-        el('div', 'cnt d', '\u2212 ' + nf(a.removed), working && dots())),
-      el('p', 'sum', a.last_summary || 'No updates yet'),
-      a.last_file && el('div', 'file m', a.last_file));
-    root.append(card);
-  }
-}
+        <section class="sidebar-section">
+          <div class="sidebar-section-head">
+            <span class="sidebar-label">Conversations</span>
+          </div>
+          <div id="sidebar-chats" class="sidebar-list"></div>
+        </section>
+      </div>
 
-function renderConns() {
-  const root = $('#conns'); root.replaceChildren();
-  if (!S.agents.length) root.append(el('p', 'empty', 'Waiting for agents…'));
-  for (const a of S.agents) root.append(el('div', 'leaf', el('span', 'dot ' + a.status), el('span', 'nm', a.display), el('span', 'tag mut', a.status)));
-}
+      <div class="sidebar-foot">
+        <div class="sidebar-profile-foot">
+          <button type="button" id="btn-profile-open" class="sidebar-profile-btn" data-view="profile" title="Profil & Kullanım">
+            <span class="profile-avatar-dot">M</span>
+            <span class="sidebar-label">Profil</span>
+          </button>
+          <button type="button" id="btn-settings-quick" class="sidebar-mini-btn" data-view="settings" title="Ayarlar (Ctrl+,)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
 
-function renderTree() {
-  const root = $('#tree'); root.replaceChildren();
-  const lockBy = new Map(S.locks.map((l) => [l.file, l.agent]));
-  const files = new Set([...S.tree, ...S.locks.map((l) => l.file), ...S.diffs.map((d) => d.file)]);
-  if (!files.size) return void root.append(el('p', 'empty', 'No files found.'));
-  const dirs = new Set(); const rows = [];
-  for (const f of [...files].sort((a, b) => a.localeCompare(b))) {
-    const parts = f.split('/');
-    let acc = '', hidden = false;
-    for (let i = 0; i < parts.length - 1; i++) {
-      acc = acc ? acc + '/' + parts[i] : parts[i];
-      if (!dirs.has(acc)) { dirs.add(acc); if (!hidden) rows.push({ dir: acc, depth: i, name: parts[i] }); }
-      if (S.collapsed.has(acc)) hidden = true;
-    }
-    if (!hidden) rows.push({ file: f, depth: parts.length - 1, name: parts[parts.length - 1] });
-  }
-  for (const r of rows) {
-    if (r.dir) {
-      const b = el('button', 'leaf', (S.collapsed.has(r.dir) ? '\u25b8 ' : '\u25be ') + r.name);
-      b.style.paddingLeft = 8 + r.depth * 14 + 'px'; b.type = 'button';
-      b.onclick = () => { S.collapsed.has(r.dir) ? S.collapsed.delete(r.dir) : S.collapsed.add(r.dir); renderTree(); };
-      root.append(b);
-    } else {
-      const b = el('button', 'leaf m' + (S.selected === r.file ? ' on' : ''), el('span', 'nm', r.name));
-      b.style.paddingLeft = 8 + r.depth * 14 + 'px'; b.type = 'button'; b.title = r.file;
-      const holder = lockBy.get(r.file);
-      if (holder) { const t = el('span', 'tag', 'locked \u00b7 ' + nameOf(holder)); t.dataset.kind = kindOf(holder); t.style.color = 'var(--ac)'; b.append(t); }
-      b.onclick = () => { S.selected = r.file; S.pinned = true; setTab('code'); loadDiff(); renderTree(); };
-      root.append(b);
-    }
-  }
-}
+    <main id="stage" class="stage" data-empty="true">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="pill-chip project-chip">
+            <span class="dot-live"></span>
+            <span id="project-name">Masiva Labs</span>
+          </div>
+          <div id="mcp-presence" class="presence-strip"></div>
+        </div>
 
-function patchView(patch) {
-  const box = el('div', 'code'); let o = 0, n = 0;
-  for (const line of patch.split('\n')) {
-    if (/^(Index:|={5,}|--- |\+\+\+ )/.test(line) || line === '') continue;
-    if (line.startsWith('@@')) { const m = /@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(line); if (m) { o = +m[1]; n = +m[2]; } box.append(el('div', 'ln h', el('i', null, ''), el('b', null, ''), line)); continue; }
-    const c = line[0], txt = line.slice(1);
-    if (c === '+') box.append(el('div', 'ln a', el('i', null, n++), el('b', null, '+'), txt));
-    else if (c === '-') box.append(el('div', 'ln d', el('i', null, o++), el('b', null, '\u2212'), txt));
-    else if (c === ' ') { box.append(el('div', 'ln', el('i', null, n++), el('b', null, ''), txt)); o++; }
-  }
-  return box;
-}
+        <div id="top-mode-switch" class="mode-switch" data-active="direct" role="tablist" aria-label="Çalışma modu">
+          <div id="mode-switch-thumb" class="mode-switch-thumb" aria-hidden="true"></div>
+          <button type="button" class="mode-switch-btn" data-top-mode="direct" role="tab">Direct</button>
+          <button type="button" class="mode-switch-btn" data-top-mode="task" role="tab">Task</button>
+        </div>
 
-function renderDiff() {
-  const head = $('#diffhead'), body = $('#diff'); head.replaceChildren(); body.replaceChildren();
-  if (!S.selected) {
-    head.append('No file selected.');
-    body.append(el('p', 'empty', 'Pick a file in the explorer. Diffs appear when an agent locks a file, edits it, then posts a status or unlocks.'));
-    return;
-  }
-  head.append(el('span', 'm', S.selected));
-  const d = S.diffData && S.diffData.file === S.selected ? S.diffData.diffs : null;
-  if (!d) return void body.append(el('p', 'empty', 'Loading…'));
-  if (!d.length) return void body.append(el('p', 'empty', 'No changes captured for this file yet.'));
-  for (const x of d) {
-    body.append(el('div', 'dh', nameOf(x.agent) + ' \u00b7 ' + age(x.ts) + ' ago \u00b7 ', el('span', 'm', '+' + x.added + ' \u2212' + x.removed)), patchView(x.patch));
-  }
-}
+        <div class="topbar-right">
+          <button type="button" class="pill-chip accent-chip" id="btn-handoff-quick" title="Bağlamı başka ajana devret">
+            Limit Devri
+          </button>
+          <button type="button" class="pill-chip right-toggle-btn" id="btn-right-toggle" title="Sağ Panel (Canlı, Hafıza, Kilitler, Dosyalar)" aria-expanded="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="3" />
+              <path d="M15 4v16" />
+            </svg>
+            <span class="rail-badge" id="locks-badge" hidden>0</span>
+          </button>
+        </div>
+      </header>
 
-async function loadDiff() {
-  const f = S.selected; if (!f) return renderDiff();
-  try {
-    const r = await fetch('/api/diff?file=' + encodeURIComponent(f)); const j = await r.json();
-    if (S.selected === f) { S.diffData = { file: f, diffs: j.diffs || [] }; renderDiff(); }
-  } catch { /* shown as Loading */ }
-  renderDiff();
-}
+      <section id="stream-wrap" class="stream-wrap">
+        <div id="hero-empty" class="hero-empty">
+          <h1 class="hero-title">Nereden başlayalım?</h1>
+          <p class="hero-sub">Çoklu ajan kodlama, otomatik diff denetimi ve sıfır kopyala-yapıştır bağlam devri.</p>
+          <div class="quick-prompts">
+            <button type="button" class="quick-chip" data-top-mode="task" data-submode="debate" data-prompt="Bu projenin mevcut mimarisini inceleyip riskleri ve en temiz sonraki adımı çıkarın.">Mimari İstişare</button>
+            <button type="button" class="quick-chip" data-top-mode="task" data-submode="code_review" data-prompt="Son değişiklikleri veya hedef modülü inceleyip iyileştirme önerisi ve test planı üretin.">Kodla → İncele</button>
+            <button type="button" class="quick-chip" data-open-rp="memory">Limit Devri Özeti</button>
+          </div>
+        </div>
 
-function bubble(e, me) {
-  const k = kindOf(e.agent);
-  const who = el('div', 'who', avatar(k, nameOf(e.agent), ''), nameOf(e.agent) + (e.to_agent ? ' \u2192 ' + (e.to_agent === 'all' ? 'all' : nameOf(e.to_agent)) : ''), el('span', 't', hhmm(e.ts)));
-  const b = el('div', 'bub' + (me ? ' me' : ''), who); b.dataset.kind = k; return b;
-}
+        <div id="messages" class="messages"></div>
+      </section>
 
-function renderChat() {
-  const box = $('#chat'); box.replaceChildren();
-  if (!S.events.length) box.append(el('p', 'empty', 'No messages yet. Agent updates, questions and file locks will show up here.'));
-  for (const e of S.events) {
-    if (e.type === 'lock') box.append(el('div', 'alert', nameOf(e.agent) + ' locked ', el('span', 'm', e.file)));
-    else if (e.type === 'unlock') box.append(el('div', 'alert', nameOf(e.agent) + ' unlocked ', el('span', 'm', e.file), (e.added || e.removed) ? ' (+' + e.added + ' \u2212' + e.removed + ')' : ''));
-    else if (e.type === 'system') box.append(el('div', 'alert', e.text));
-    else if (e.type === 'status') {
-      const b = bubble(e, false);
-      put(b, el('span', 'chip', e.action || 'INFO'), e.file && e.file !== '-' && el('span', 'm', e.file + ' '), el('div', null, e.text), (e.added || e.removed) ? el('div', 'file m', '+' + e.added + ' \u2212' + e.removed) : null);
-      box.append(b);
-    } else if (e.type === 'ask') {
-      const b = bubble(e, false);
-      put(b, e.reply_to && el('span', 'chip', 're #' + e.reply_to), el('span', 'chip', '?'), e.text); box.append(b);
-    } else if (e.type === 'human') {
-      const b = bubble(e, true); b.append(e.text); box.append(b);
-    }
-  }
-  if (S.follow) box.scrollTop = box.scrollHeight;
-  renderPause();
-}
+      <div class="composer-dock">
+        <div class="composer-halo" aria-hidden="true"></div>
+        <div id="composer-wrap" class="composer-wrap">
+          <div id="plus-popover" class="plus-popover" aria-hidden="true"></div>
+          <div id="model-popover" class="model-popover" aria-hidden="true"></div>
 
-function isPaused() {
-  for (let i = S.events.length - 1; i >= 0; i--) { const e = S.events[i]; if (e.type === 'human') { if (e.text.startsWith('PAUSE:')) return true; if (e.text.startsWith('RESUME:')) return false; } }
-  return false;
-}
-function renderPause() { $('#pause').textContent = isPaused() ? 'Resume all' : 'Pause all'; }
+          <form id="composer-form" class="composer-pill">
+            <textarea
+              id="prompt-input"
+              rows="1"
+              placeholder="Ajanlara görev ver..."
+              autocomplete="off"
+              spellcheck="false"
+            ></textarea>
 
-function renderControl() {
-  const c = $('#ctl'); c.replaceChildren();
-  c.append(el('div', null, el('h2', null, 'Active locks')));
-  if (!S.locks.length) c.lastChild.append(el('p', 'empty', 'No active locks.'));
-  else {
-    const t = el('table', null, el('tr', null, el('th', null, 'File'), el('th', null, 'Held by'), el('th', null, 'Since'), el('th', null, '')));
-    for (const l of S.locks) {
-      const b = el('button', 'btn', 'Force unlock'); b.type = 'button';
-      b.onclick = () => post('/api/unlock', { file: l.file }).then(() => showErr(null)).catch(showErr);
-      t.append(el('tr', null, el('td', 'm', l.file), el('td', null, nameOf(l.agent)), el('td', null, age(l.ts)), el('td', null, b)));
-    }
-    c.lastChild.append(t);
-  }
-  c.append(el('div', null, el('h2', null, 'Notes'), el('p', 'mut', 'Locks are advisory: Synergy tells agents not to edit locked files, it cannot block writes. A lock expires after 10 minutes unless its holder renews it. Agents write their summaries in the language selected at the top once they read the feed.')));
-}
+            <div class="composer-bar">
+              <div class="composer-tools">
+                <button type="button" id="btn-composer-plus" class="plus-btn" title="Ekle / Yükle" aria-expanded="false">+</button>
+                <div id="task-submode-slot"></div>
+                <button type="button" id="btn-write-toggle" class="tool-toggle" hidden title="Yazıcı ajanın dosyaları düzenlemesine izin ver">
+                  Dosya Yazma
+                </button>
+                <button type="button" id="btn-mcp-target" class="tool-toggle" hidden title="Bitince IDE MCP ajanına devret">
+                  → IDE MCP
+                </button>
+              </div>
 
-function setTab(t) {
-  S.tab = t; $('#main').dataset.tab = t;
-  for (const b of document.querySelectorAll('.tab')) { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); }
-}
+              <div class="composer-actions">
+                <button type="button" id="btn-model-trigger" class="model-trigger" aria-expanded="false">
+                  <span id="model-trigger-content">Ajan Seç</span>
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m4 6 4 4 4-4"/></svg>
+                </button>
+                <button type="submit" id="btn-send" class="send-btn" title="Gönder">→</button>
+              </div>
+            </div>
+          </form>
 
-function renderAll() { renderTop(); renderAgents(); renderConns(); renderTree(); renderChat(); renderControl(); renderDiff(); }
+          <div class="composer-meta">
+            Mod: <strong id="meta-mode-label">Direct</strong> · <span id="meta-status-text">Hazır</span>
+          </div>
 
-async function loadTree() { try { const j = await (await fetch('/api/tree')).json(); S.tree = j.files || []; renderTree(); } catch { /* ignore */ } }
-let treeTimer; const treeSoon = () => { clearTimeout(treeTimer); treeTimer = setTimeout(loadTree, 800); };
+          <input type="file" id="file-upload-input" accept="image/*" hidden />
+          <input type="file" id="bundle-upload-input" multiple hidden />
+        </div>
+      </div>
+    </main>
 
-// ---- wiring
-for (const b of document.querySelectorAll('.tab')) b.onclick = () => setTab(b.dataset.tab);
-$('#forcebtn').onclick = () => setTab('control');
-$('#pause').onclick = () => post('/api/message', { text: isPaused() ? 'RESUME: you may continue.' : 'PAUSE: stop editing and wait for the human.' }).catch(showErr);
-$('#send').onsubmit = (ev) => { ev.preventDefault(); const i = $('#msg'); const t = i.value.trim(); if (!t) return; post('/api/message', { text: t }).then(() => { i.value = ''; S.follow = true; showErr(null); }).catch(showErr); };
-$('#chat').onscroll = (ev) => { const c = ev.target; S.follow = c.scrollHeight - c.scrollTop - c.clientHeight < 40; };
-const sel = $('#lang'); for (const [v, n] of LANGS) sel.append(Object.assign(el('option', null, n), { value: v }));
-sel.onchange = () => post('/api/lang', { lang: sel.value }).catch(showErr);
+    <aside id="right-panel" class="right-panel is-open" aria-hidden="false" aria-label="Sağ panel">
+      <div class="rp-head">
+        <div class="rp-tabs" role="tablist">
+          <button type="button" class="rp-tab active" data-rp-tab="live" role="tab">Canlı</button>
+          <button type="button" class="rp-tab" data-rp-tab="memory" role="tab">Hafıza</button>
+          <button type="button" class="rp-tab" data-rp-tab="locks" role="tab">Kilitler</button>
+          <button type="button" class="rp-tab" data-rp-tab="files" role="tab">Dosyalar</button>
+        </div>
+      </div>
+      <div id="right-panel-body" class="rp-body"></div>
+    </aside>
 
-const es = new EventSource('/events');
-es.addEventListener('init', (m) => {
-  const d = JSON.parse(m.data);
-  Object.assign(S, { agents: d.state.agents, locks: d.state.locks, events: d.events, diffs: d.diffs, lang: d.lang, project: d.project });
-  if (!S.pinned && S.diffs.length) S.selected = S.diffs[S.diffs.length - 1].file;
-  renderAll(); loadDiff(); loadTree();
-});
-es.addEventListener('events', (m) => { S.events.push(...JSON.parse(m.data)); if (S.events.length > 300) S.events.splice(0, S.events.length - 300); renderChat(); });
-es.addEventListener('state', (m) => { const d = JSON.parse(m.data); S.agents = d.state.agents; S.locks = d.state.locks; S.lang = d.lang; renderTop(); renderAgents(); renderConns(); renderTree(); renderControl(); });
-es.addEventListener('diffs', (m) => {
-  const d = JSON.parse(m.data); S.diffs.push(...d); if (S.diffs.length > 100) S.diffs.splice(0, S.diffs.length - 100);
-  const last = d[d.length - 1];
-  if (!S.pinned) S.selected = last.file;
-  if (d.some((x) => x.file === S.selected)) loadDiff();
-  treeSoon(); renderTree();
-});
-es.onerror = () => { $('#livetxt').textContent = 'Reconnecting…'; $('#livedot').className = 'dot idle'; };
-es.onopen = () => renderTop();
-setInterval(() => { renderAgents(); renderConns(); renderControl(); }, 20000);
-setInterval(loadTree, 15000);
-})();
-</script>
+    <div id="view-overlay" class="view-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="view-card">
+        <div class="view-head">
+          <h2 id="view-title"></h2>
+          <button type="button" id="btn-view-close" class="icon-close" title="Kapat">×</button>
+        </div>
+        <div id="view-body" class="view-body"></div>
+      </div>
+    </div>
+
+    <div id="search-overlay" class="search-overlay" aria-hidden="true">
+      <div class="search-card">
+        <div class="search-head">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="search-input" class="search-input" placeholder="Sohbet, proje, ayar veya ajan ara... (Ctrl+F)" autocomplete="off" />
+          <span class="kbd-hint">ESC</span>
+        </div>
+        <div id="search-results" class="search-results"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+  </div>
+
+  <script type="module" src="/app/main.js"></script>
 </body>
 </html>

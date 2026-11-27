@@ -9,8 +9,9 @@ export function normalizeFile(root: string, file: string): string {
   if (!f) throw new Error('file is empty');
   const rootPosix = path.resolve(root).replace(/\\/g, '/').replace(/\/+$/, '');
   if (f.startsWith('/') || /^[a-zA-Z]:\//.test(f)) {
+    const fResolved = path.resolve(f).replace(/\\/g, '/');
     const cmp = (s: string) => (process.platform === 'win32' ? s.toLowerCase() : s);
-    if (cmp(f).startsWith(cmp(rootPosix) + '/')) f = f.slice(rootPosix.length + 1);
+    if (cmp(fResolved).startsWith(cmp(rootPosix) + '/')) f = fResolved.slice(rootPosix.length + 1);
     else throw new Error('file is outside the project root');
   }
   const norm = path.posix.normalize(f).replace(/^(\.\/)+/, '');

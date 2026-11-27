@@ -51,6 +51,8 @@ export function formatEvent(e: EventRow, now: number): string {
       const re = e.reply_to ? ` re#${e.reply_to}` : '';
       return `${head}\u2192${e.to_agent ?? 'all'}${re} ? ${e.text}`;
     }
+    case 'command':
+      return `${head}\u2192${e.to_agent ?? 'all'} CMD: ${e.text}`;
     case 'human':
       return `${head}${e.to_agent ? `\u2192${e.to_agent}` : ''} ! ${e.text}`;
     default:

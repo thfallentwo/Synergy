@@ -32,11 +32,11 @@ async function main() {
   });
   const cmd = positionals[0];
   if (values.version) return void process.stdout.write(pkg.version + '\n');
-  if (values.help || (!cmd && !values.demo)) return void process.stdout.write(HELP);
+  if (values.help) return void process.stdout.write(HELP);
 
   if (cmd === 'serve') return serve({ root: values.root });
   if (cmd === 'init') return init({ root: values.root, force: values.force, linkRules: values['link-rules'], write: values.write });
-  if (cmd === 'ui' || values.demo) {
+  if (!cmd || cmd === 'ui' || values.demo) {
     return ui({ root: values.root, port: values.port, noOpen: values['no-open'], demo: values.demo, speed: values.speed });
   }
   process.stderr.write(`Unknown command: ${cmd}\n${HELP}`);

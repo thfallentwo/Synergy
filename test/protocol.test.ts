@@ -38,6 +38,7 @@ describe('formatEvent', () => {
     expect(formatEvent(ev({ type: 'unlock' }), now)).toBe('#1 2m claude UNLOCKED auth.ts');
     expect(formatEvent(ev({ type: 'ask', to_agent: 'cursor', text: 'why?' }), now)).toBe('#1 2m claude\u2192cursor ? why?');
     expect(formatEvent(ev({ type: 'ask', to_agent: 'cursor', reply_to: 7, text: 'ok' }), now)).toContain('re#7');
+    expect(formatEvent(ev({ type: 'command', to_agent: 'cursor', text: 'run tests' }), now)).toBe('#1 2m claude\u2192cursor CMD: run tests');
     expect(formatEvent(ev({ type: 'human', agent: 'human', text: 'stop' }), now)).toBe('#1 2m [Human] ! stop');
     expect(formatEvent(ev({ type: 'system', agent: 'system', text: 'x expired' }), now)).toBe('#1 2m * x expired');
   });
@@ -57,6 +58,9 @@ describe('normalizeAgent', () => {
     expect(normalizeAgent('Cursor')).toBe('cursor');
     expect(normalizeAgent('Gemini CLI')).toBe('gemini');
     expect(normalizeAgent('OpenAI Codex')).toBe('codex');
+    expect(normalizeAgent('Perplexity')).toBe('perplexity');
+    expect(normalizeAgent('DeepSeek V4.1 Flash')).toBe('deepseek');
+    expect(normalizeAgent('NVIDIA Nemotron 3 Ultra')).toBe('nemotron');
     expect(normalizeAgent('Antigravity')).toBe('antigravity');
     expect(normalizeAgent('Human')).toBe('human');
   });

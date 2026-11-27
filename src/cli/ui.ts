@@ -34,7 +34,7 @@ export async function ui(opts: UiCliOptions): Promise<void> {
   if (port !== undefined && !(port > 0 && port < 65536)) throw new Error('invalid --port');
   const server = await startUiServer(svc, { port, uiDir: findUiDir() });
 
-  say(`Synergy dashboard: ${server.url}${opts.demo ? '  (demo mode, simulated agents)' : `  (project: ${root})`}`);
+  say(`Masiva Labs dashboard: ${server.url}${opts.demo ? '  (demo mode, simulated agents)' : `  (project: ${root})`}`);
   say('Press Ctrl+C to stop.');
   if (!opts.noOpen) {
     try {

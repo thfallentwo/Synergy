@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { memSynergy } from './helpers';
+import { createSkill } from '../src/core/customization';
+import { getGitStatus } from '../src/core/git';
+import { resolveAgentLaunchTarget } from '../src/core/launcher';
+import { summarizeFinalText } from '../src/core/liveObserver';
+import { Synergy } from '../src/core/service';
+import { translatePrompt } from '../src/core/translate';
+import { addWorkflowAttachment, mutateWorkflowTask, readWorkflow, saveWorkflowPatch, stepWorkflowAutopilot } from '../src/core/workflow';
+import { openDb } from '../src/core/store';
+import { memSynergy, tmpRoot } from './helpers';
 
 describe('post_status', () => {
   it('stores and returns an id; trims long summaries', () => {
@@ -147,5 +155,272 @@ describe('state', () => {
     for (let i = 0; i < 6; i++) small.postStatus({ agent: 'a', action: 'INFO', file: '-', summary: `m${i}` });
     small.prune();
     expect(small.recentEvents(100).map((e: any) => e.text)).toEqual(['m3', 'm4', 'm5']);
+  });
+
+  it('clears agents without removing human', () => {
+    const { svc } = memSynergy();
+    svc.humanSend('hello');
+    svc.readFeed({ agent: 'claude' });
+    svc.readFeed({ agent: 'cursor' });
+    expect(svc.state().agents).toHaveLength(2);
+    expect(svc.clearAgents()).toBe(2);
+    expect(svc.state().agents).toHaveLength(0);
+  });
+});
+
+describe('commands & approvals', () => {
+  it('queues pending commands and supports deny, allow, always, and revoke', () => {
+    const { svc } = memSynergy();
+    svc.readFeed({ agent: 'claude' });
+
+    // 1. Denied command does not reach target events
+    expect(svc.sendCommand({ from: 'cursor', to: 'claude', command: 'delete db' })).toMatch(/^PENDING cmd#1/);
+    expect(svc.state().pendingCommands).toHaveLength(1);
+    expect(svc.resolveCommand(1, 'deny')).toEqual({ status: 'denied' });
+    expect(svc.state().pendingCommands).toHaveLength(0);
+    expect(svc.postStatus({ agent: 'claude', action: 'INFO', file: '-', summary: 'hi' })).not.toContain('delete db');
+
+    // 2. Allowed once delivers command to target
+    expect(svc.sendCommand({ from: 'cursor', to: 'claude', command: 'check types' })).toMatch(/^PENDING cmd#2/);
+    expect(svc.resolveCommand(2, 'allow').status).toBe('approved');
+    expect(svc.postStatus({ agent: 'claude', action: 'INFO', file: '-', summary: 'ok' })).toContain('cursor\u2192claude CMD: check types');
+
+    // 3. Always allow trusts sender for subsequent commands until revoked
+    expect(svc.sendCommand({ from: 'cursor', to: 'claude', command: 'run lint' })).toMatch(/^PENDING cmd#3/);
+    expect(svc.resolveCommand(3, 'always').status).toBe('approved');
+    expect(svc.state().trustedAgents).toEqual(['cursor']);
+    expect(svc.sendCommand({ from: 'cursor', to: 'claude', command: 'run build' })).toMatch(/^OK #\d+ \(auto-approved\)/);
+    expect(svc.state().pendingCommands).toHaveLength(0);
+
+    expect(svc.revokeTrustedAgent('cursor')).toBe(true);
+    expect(svc.state().trustedAgents).toEqual([]);
+    expect(svc.sendCommand({ from: 'cursor', to: 'claude', command: 'need approval again' })).toMatch(/^PENDING cmd#5/);
+  });
+
+  it('queues and completes Perplexity research requests', () => {
+    const { svc } = memSynergy();
+    const req = svc.queueResearch({ from: 'codex', query: 'Check X brand trademark status' });
+    expect(req.id).toBe(1);
+    expect(svc.state().pendingResearch).toHaveLength(1);
+    const done = svc.completeResearch(req.id, 'X brand trademark is registered in class 9 and 42.');
+    expect(done.eventId).toBeGreaterThan(1);
+    expect(svc.state().pendingResearch).toHaveLength(0);
+    expect(svc.readFeed({ agent: 'codex' })).toContain('perplexity\u2192codex re#' + req.askEventId);
+  });
+
+  it('edits and recalls human messages', () => {
+    const { svc } = memSynergy();
+    const { id } = svc.humanSend('@claude old text');
+    svc.editHumanMessage(id, '@cursor updated text');
+    expect(svc.recentEvents().find((e) => e.id === id)).toMatchObject({ to_agent: 'cursor', text: 'updated text' });
+    const recalled = svc.deleteHumanMessage(id);
+    expect(recalled).toMatchObject({ ok: true, text: '@cursor updated text' });
+    expect(svc.recentEvents().some((e) => e.id === id)).toBe(false);
+  });
+
+  it('supports per-agent pause/resume and recalling last human message', () => {
+    const { svc } = memSynergy();
+    svc.setAgentPaused('gemini', true);
+    expect(svc.state().pausedAgents).toEqual(['gemini']);
+    expect(svc.recentEvents().at(-1)).toMatchObject({ type: 'human', to_agent: 'gemini', text: 'PAUSE: stop editing and wait for the human.' });
+    svc.setAgentPaused('gemini', false);
+    expect(svc.state().pausedAgents).toEqual([]);
+
+    svc.humanSend('first');
+    svc.humanSend('second');
+    expect(svc.recallLastHumanMessage()).toMatchObject({ ok: true, text: 'second' });
+    expect(svc.recallLastHumanMessage()).toMatchObject({ ok: true, text: 'first' });
+  });
+
+  it('seeds fixed Çevirmen role, assigns it to agents, and exposes role in readFeed', () => {
+    const { svc } = memSynergy();
+    const roles = svc.listRoles();
+    expect(roles.map((r) => r.title)).toEqual(['Çevirmen']);
+    const tr = roles[0];
+    svc.assignRole(tr.id, 'deepseek');
+    const feed = svc.readFeed({ agent: 'deepseek' });
+    expect(feed).toContain('ROLE: Çevirmen');
+
+    const custom = svc.createRole({ title: 'Test Uzmanı', description: 'Sadece test yazar', agent: 'cursor' });
+    expect(svc.state().agents.some((a) => a.name === 'cursor')).toBe(false);
+    expect(svc.readFeed({ agent: 'cursor' })).toContain('ROLE: Test Uzmanı — Sadece test yazar');
+    expect(svc.deleteRole(custom.id)).toBe(true);
+  });
+
+  it('supports creating, switching, clearing, and deleting chats', () => {
+    const { svc } = memSynergy();
+    svc.humanSend('in main');
+    const c2 = svc.createChat('Feature Branch');
+    expect(svc.activeChatId()).toBe(c2.id);
+    expect(svc.recentEvents()).toHaveLength(0);
+    svc.humanSend('in c2');
+    expect(svc.recentEvents()).toHaveLength(1);
+    expect(svc.clearChat()).toBe(1);
+    expect(svc.recentEvents()).toHaveLength(0);
+    svc.switchChat(1);
+    expect(svc.recentEvents().map((e) => e.text)).toEqual(['in main']);
+    expect(svc.deleteChat(c2.id)).toBe(true);
+  });
+
+  it('archives, restores, and purges archived chats', () => {
+    const { svc } = memSynergy();
+    const c2 = svc.createChat('Old Sprint');
+    svc.humanSend('archived msg');
+    svc.archiveChat(c2.id, true);
+    expect(svc.activeChatId()).not.toBe(c2.id);
+    expect(svc.listChats().find((c) => c.id === c2.id)?.archived).toBe(1);
+    expect(svc.deleteAllArchivedChats()).toBe(1);
+    expect(svc.listChats().some((c) => c.id === c2.id)).toBe(false);
+  });
+
+  it('updates cleared_at on clearChat and deduplicates empty New Chat creation', () => {
+    const { svc, clock } = memSynergy();
+    clock.advance(100);
+    const n1 = svc.createChat();
+    const n2 = svc.createChat();
+    expect(n2.id).toBe(n1.id);
+
+    svc.humanSend('first msg');
+    clock.advance(100);
+    const n3 = svc.createChat();
+    expect(n3.id).not.toBe(n1.id);
+    const n4 = svc.createChat();
+    expect(n4.id).toBe(n3.id);
+
+    svc.humanSend('in n3');
+    const beforeClear = n3.cleared_at ?? 0;
+    clock.advance(100);
+    expect(svc.clearChat()).toBe(1);
+    const afterClear = svc.listChats().find((c) => c.id === n3.id)?.cleared_at ?? 0;
+    expect(afterClear).toBeGreaterThan(beforeClear);
+  });
+
+  it('runs the meeting table lifecycle with connected-only seats, mute/deaf isolation, and markdown notes', () => {
+    const root = tmpRoot();
+    const svc = new Synergy(openDb(':memory:'), { root });
+    svc.readFeed({ agent: 'claude' });
+    svc.readFeed({ agent: 'deepseek' });
+    svc.readFeed({ agent: 'codex' });
+    svc.humanSend('/meeting Memory Leak Bug');
+    const mt = svc.state().meeting!;
+    expect(mt.status).toBe('active');
+    expect(mt.title).toBe('Memory Leak Bug');
+    expect(mt.seats.slice().sort()).toEqual(['claude', 'codex', 'deepseek']);
+
+    svc.meetingToggleDeaf('codex', true);
+    expect(svc.readFeed({ agent: 'codex' })).not.toContain('MEETING ACTIVE');
+    expect(svc.readFeed({ agent: 'claude' })).toContain('MEETING ACTIVE');
+
+    svc.meetingRaiseHand({ agent: 'claude', reason: 'Reverse engineering' });
+    svc.meetingRaiseHand({ agent: 'deepseek', reason: 'Full scan' });
+    svc.meetingGrantFloor('deepseek');
+    const s1 = svc.meetingSpeak({ from: 'deepseek', text: 'Scan all files' });
+    expect(s1.meeting.floorAgent).toBeNull();
+
+    svc.meetingToggleMute('deepseek', true);
+    expect(() => svc.meetingRaiseHand({ agent: 'deepseek' })).toThrow(/muted/);
+
+    svc.meetingGrantFloor('claude');
+    const s2 = svc.meetingSpeak({ from: 'claude', text: 'Use reverse engineering first' });
+    const afterNote = svc.meetingAcceptNote(s2.messageId);
+    expect(afterNote.notes).toHaveLength(1);
+    expect(afterNote.savedFile).toBeTruthy();
+
+    const files = svc.listMeetingNotes();
+    expect(files).toHaveLength(1);
+    expect(svc.readMeetingNote(files[0].file)).toContain('Use reverse engineering first');
+
+    const ended = svc.endMeeting();
+    expect(ended?.status).toBe('ended');
+    expect(svc.state().meeting).toBeNull();
+  });
+
+  it('compresses long live output to 2-3 summary lines', () => {
+    const raw = '# Title\n\nLine one summary.\nLine two summary.\n```ts\nconst huge = 1;\n```\nLine three.\nLine four ignored.\nLine five ignored.';
+    const out = summarizeFinalText(raw);
+    expect(out.split('\n').length).toBeLessThanOrEqual(3);
+    expect(out).not.toContain('const huge');
+  });
+
+  it('supports incognito 24h auto-expire, no-memory instruction, multi-@ slash commands, and auto-naming', () => {
+    const { svc, clock } = memSynergy();
+    const incog = svc.createChat({ incognito: true, participants: ['claude', 'gemini'] });
+    expect(incog.incognito).toBe(1);
+    expect(svc.readFeed({ agent: 'claude' })).toContain('INCOGNITO CHAT');
+    expect(() => svc.archiveChat(incog.id, true)).toThrow(/incognito/);
+
+    // /think requires topic; /image requires image-capable AI
+    expect(() => svc.humanSend('@claude /think')).toThrow(/what to think/);
+    expect(() => svc.humanSend('@claude /image draw logo')).toThrow(/image-capable/);
+    svc.humanSend('@claude @gemini /goal Fix login race condition cleanly');
+
+    const updated = svc.listChats().find((c) => c.id === incog.id)!;
+    expect(updated.title).not.toBe('Incognito Chat');
+    expect(['claude', 'gemini']).toContain(updated.named_by);
+    const lastEv = svc.recentEvents().slice(-1)[0];
+    expect(lastEv.to_agent).toBe('claude,gemini');
+    expect(lastEv.text).toContain('[GOAL]');
+
+    // Direct search + image-capable @gemini works
+    svc.humanSend('@gemini /search Latest Node LTS features');
+    expect(svc.recentEvents().slice(-1)[0].text).toContain('[SEARCH]');
+    svc.humanSend('@gemini /image minimal neon logo');
+    expect(svc.recentEvents().slice(-1)[0].text).toContain('[IMAGE]');
+
+    // 24 hours later -> incognito chat disappears automatically
+    clock.advance(24 * 60 * 60_000 + 1);
+    expect(svc.listChats().some((c) => c.id === incog.id)).toBe(false);
+  });
+
+  it('translates prompt prose while preserving @mentions, /commands, code, and tech terms', async () => {
+    const fakeFetch = (async (url: string | URL | Request) => {
+      expect(String(url)).toContain('translate.googleapis.com');
+      return {
+        ok: true,
+        json: async () => [[['__AGORA_T0__ __AGORA_T1__ please fix __AGORA_T2__ in __AGORA_T3__', 'src']]],
+      } as unknown as Response;
+    }) as typeof fetch;
+
+    const out = await translatePrompt('@claude /goal düzelt API içinde src/auth.ts', 'en', tmpRoot(), fakeFetch);
+    expect(out.translated).toBe('@claude /goal please fix API in src/auth.ts');
+  });
+
+  it('creates custom skills with 20-char name limit and inspects git status safely', () => {
+    const root = tmpRoot();
+    expect(() => createSkill(root, { name: 'a'.repeat(21), description: 'too long' })).toThrow(/1-20/);
+    const skills = createSkill(root, { name: 'auth-guard', description: 'Checks OAuth & JWT security.', agent: 'claude' });
+    const added = skills.find((s) => s.name === 'auth-guard');
+    expect(added).toMatchObject({ name: 'auth-guard', source: 'workspace', agent: 'claude' });
+
+    const gs = getGitStatus(root);
+    expect(gs.isRepo).toBe(false);
+  });
+
+  it('prunes unused empty New Chat drafts when switching to another chat', () => {
+    const { svc } = memSynergy();
+    svc.humanSend('in main chat');
+    const draft = svc.createChat();
+    expect(draft.title).toBe('New Chat');
+    expect(svc.listChats().find((c) => c.id === 1)?.event_count).toBe(1);
+
+    svc.switchChat(1);
+    expect(svc.listChats().some((c) => c.id === draft.id)).toBe(false);
+  });
+
+  it('manages workflow rules, info, 50-image cap, autopilot step, and launcher targets', async () => {
+    const root = tmpRoot();
+    const svc = new Synergy(openDb(':memory:'), { root });
+    saveWorkflowPatch(root, { rules: 'Keep functions tiny', info: 'Project notes', running: true });
+    mutateWorkflowTask(root, 'add', { title: 'Audit login flow', agent: 'claude' });
+    const b64 = Buffer.from('fakeimg').toString('base64');
+    for (let i = 0; i < 50; i++) addWorkflowAttachment(root, { name: `img${i}.png`, kind: 'image', dataBase64: b64 });
+    expect(() => addWorkflowAttachment(root, { name: 'img51.png', kind: 'image', dataBase64: b64 })).toThrow(/50/);
+
+    const ran = await stepWorkflowAutopilot(svc, async () => ({ ok: false, transport: 'none' }));
+    expect(ran).toBe(true);
+    expect(readWorkflow(root).tasks[0].status).toBe('done');
+    expect(svc.recentEvents().at(-1)?.text).toContain('[WORKFLOW]');
+
+    expect(resolveAgentLaunchTarget('deepseek').url).toContain('deepseek.com');
   });
 });
