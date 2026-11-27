@@ -1,4 +1,4 @@
-# Masiva Labs (`synergy-mcp`)
+# Masiva Labs 
 
 Local-first **multi-agent coding workspace & MCP server**. Connect your IDE agents (Antigravity, Cursor, Claude Code) with runnable CLI/API/local models (Codex CLI, Claude CLI, Gemini CLI, OpenAI, DeepSeek, Perplexity, Ollama) inside one shared project room — with **zero-copy-paste context handoff**, **multi-turn code + review loops**, and **advisory file locks**.
 
