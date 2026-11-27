@@ -66,12 +66,14 @@ function applyTheme(theme) {
 
 function autoResizePrompt(el) {
   if (!el) return;
+  const prevHeight = el.getBoundingClientRect().height || 26;
+  el.style.transition = 'none';
   el.style.height = 'auto';
-  el.style.height = `${Math.min(180, Math.max(26, el.scrollHeight))}px`;
-  const wrap = document.getElementById('composer-wrap');
-  if (wrap) {
-    wrap.classList.toggle('typing', el.value.trim().length > 0);
-  }
+  const nextHeight = Math.min(180, Math.max(26, el.scrollHeight));
+  el.style.height = `${prevHeight}px`;
+  void el.offsetHeight;
+  el.style.transition = '';
+  el.style.height = `${nextHeight}px`;
 }
 
 function ensureActiveChatLockFromEvents() {
@@ -91,28 +93,17 @@ function ensureActiveChatLockFromEvents() {
   }
 }
 
-async function refreshMetadata() {
-  const [catRes, memRes, olRes, mcpRes, keysRes, skillsRes, treeRes, gitRes, usageRes, prefsRes] =
-    await Promise.allSettled([
-      apiGet('/api/agents/catalog'),
-      apiGet('/api/memory'),
-      apiGet('/api/ollama/status'),
-      apiGet('/api/mcp/setup'),
-      apiGet('/api/settings/api-keys'),
-      apiGet('/api/skills'),
-      apiGet('/api/tree'),
-      apiGet('/api/git/status'),
-      apiGet('/api/usage'),
-      apiGet('/api/agents/prefs'),
-    ]);
-
-  if (catRes.status === 'fulfilled') {
-    store.catalog = catRes.value.agents ?? [];
-    syncSelectedAgents();
-  }
+async function refreshFast() {
+  const [memRes, keysRes, skillsRes, treeRes, gitRes, usageRes, prefsRes] = await Promise.allSettled([
+    apiGet('/api/memory'),
+    apiGet('/api/settings/api-keys'),
+    apiGet('/api/skills'),
+    apiGet('/api/tree'),
+    apiGet('/api/git/status'),
+    apiGet('/api/usage'),
+    apiGet('/api/agents/prefs'),
+  ]);
   if (memRes.status === 'fulfilled') store.memory = memRes.value;
-  if (olRes.status === 'fulfilled') store.ollama = olRes.value;
-  if (mcpRes.status === 'fulfilled') store.mcpSetup = mcpRes.value;
   if (keysRes.status === 'fulfilled') store.apiKeys = keysRes.value.keys ?? [];
   if (skillsRes.status === 'fulfilled') store.skills = skillsRes.value.skills ?? [];
   if (treeRes.status === 'fulfilled') store.treeFiles = treeRes.value.files ?? [];
@@ -126,6 +117,21 @@ async function refreshMetadata() {
     if (prefsRes.value?.profileStats) store.profileStats = prefsRes.value.profileStats;
   }
   renderAll();
+}
+
+async function refreshMetadata() {
+  const [catRes, olRes, mcpRes] = await Promise.allSettled([
+    apiGet('/api/agents/catalog'),
+    apiGet('/api/ollama/status'),
+    apiGet('/api/mcp/setup'),
+  ]);
+  if (catRes.status === 'fulfilled') {
+    store.catalog = catRes.value.agents ?? [];
+    syncSelectedAgents();
+  }
+  if (olRes.status === 'fulfilled') store.ollama = olRes.value;
+  if (mcpRes.status === 'fulfilled') store.mcpSetup = mcpRes.value;
+  await refreshFast();
 }
 
 async function handleCanvasSend(dataUrl) {
@@ -283,9 +289,13 @@ async function submitPrompt() {
 }
 
 async function updateAgentEffort(agent, effort) {
-  await apiPost('/api/agents/prefs', { agent, reasoningEffort: effort });
-  await refreshMetadata();
+  const entry = store.catalog.find((a) => a.agent === agent);
+  if (entry) entry.reasoningEffort = effort;
+  renderComposerState();
   showToast(`Effort: ${EFFORT_LABELS[effort] || effort}`);
+  apiPost('/api/agents/prefs', { agent, reasoningEffort: effort }).catch((e) =>
+    showToast(e?.message || 'Effort kaydedilemedi'),
+  );
 }
 
 async function executeSearchItem(item) {
@@ -409,7 +419,7 @@ function wireEvents() {
     saveLayoutToggles();
     renderTopbar();
     renderRightPanel();
-    if (store.rightPanelOpen) refreshMetadata();
+    if (store.rightPanelOpen) refreshFast();
   });
 
   document.getElementById('btn-theme')?.addEventListener('click', () => {
@@ -608,6 +618,21 @@ function wireEvents() {
       return;
     }
 
+    if (t.id === 'toggle-task-anim' && t instanceof HTMLInputElement) {
+      store.taskAnim = Boolean(t.checked);
+      persistUiPrefs();
+      renderTopbar();
+      return;
+    }
+
+    if (t.id === 'toggle-right-default' && t instanceof HTMLInputElement) {
+      store.rightPanelOpen = Boolean(t.checked);
+      saveLayoutToggles();
+      renderTopbar();
+      renderRightPanel();
+      return;
+    }
+
     if (!t.matches('[data-effort-slider]')) return;
     const ag = t.dataset.effortSlider;
     const efforts = (t.dataset.efforts || '')
@@ -735,6 +760,27 @@ function wireEvents() {
         return;
       }
 
+      const clearBtn = t.closest('[data-clear-input]');
+      if (clearBtn) {
+        const targetId = clearBtn.dataset.clearInput;
+        const targetEl = targetId ? document.getElementById(targetId) : null;
+        if (targetEl) targetEl.value = '';
+        if (targetId === 'settings-search-input') {
+          store.settingsQuery = '';
+          renderViewOverlay(handleCanvasSend);
+          document.getElementById('settings-search-input')?.focus();
+        } else if (targetId === 'files-filter-input') {
+          renderRightPanel();
+          document.getElementById('files-filter-input')?.focus();
+        } else if (targetId === 'search-input') {
+          store.searchQuery = '';
+          store.searchIdx = 0;
+          renderSearchOverlay();
+          document.getElementById('search-input')?.focus();
+        }
+        return;
+      }
+
       const searchItem = t.closest('.search-item[data-search-idx], [data-search-idx]');
       if (searchItem) {
         const idx = Number(searchItem.dataset.searchIdx);
@@ -751,7 +797,7 @@ function wireEvents() {
         store.plusPopoverOpen = false;
         store.modelPopoverOpen = false;
         renderAll();
-        refreshMetadata();
+        refreshFast();
         return;
       }
 
@@ -760,7 +806,7 @@ function wireEvents() {
         store.plusPopoverOpen = false;
         store.modelPopoverOpen = false;
         renderAll();
-        refreshMetadata();
+        refreshFast();
         return;
       }
 
@@ -815,8 +861,10 @@ function wireEvents() {
         store.plusPopoverOpen = false;
         store.modelPopoverOpen = false;
         renderAll();
-        if (store.activeView && store.activeView !== 'canvas') {
+        if (store.activeView === 'agents') {
           refreshMetadata();
+        } else if (store.activeView && store.activeView !== 'canvas') {
+          refreshFast();
         }
         return;
       }
@@ -829,7 +877,7 @@ function wireEvents() {
         renderTopbar();
         renderRightPanel();
         if (store.rightTab === 'files' || store.rightTab === 'memory' || store.rightTab === 'locks') {
-          refreshMetadata();
+          refreshFast();
         }
         return;
       }

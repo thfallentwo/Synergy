@@ -32,11 +32,15 @@ export function mountCanvas(container, onSendImage) {
           ).join('')}
         </div>
 
-        <label class="canvas-group canvas-size-wrap" title="Fırça kalınlığı">
+        <div class="canvas-group canvas-size-wrap" title="Fırça kalınlığı">
           <span>Kalınlık</span>
-          <input type="range" class="canvas-size" min="2" max="24" value="${brushSize}" />
+          <div class="custom-slider-box">
+            <div class="custom-slider-track"><div class="custom-slider-fill" style="width:${((brushSize - 2) / 22) * 100}%"></div></div>
+            <div class="custom-slider-thumb" style="left:${((brushSize - 2) / 22) * 100}%"></div>
+            <input type="range" class="canvas-size" min="2" max="24" value="${brushSize}" />
+          </div>
           <span class="canvas-size-val">${brushSize}px</span>
-        </label>
+        </div>
 
         <div class="canvas-group canvas-actions">
           <button type="button" class="btn canvas-eraser" aria-pressed="false">Silgi</button>
@@ -168,8 +172,14 @@ export function mountCanvas(container, onSendImage) {
     });
   });
 
+  const sizeFill = container.querySelector('.custom-slider-fill');
+  const sizeThumb = container.querySelector('.custom-slider-thumb');
+
   sizeInput?.addEventListener('input', () => {
     brushSize = Math.min(24, Math.max(2, Number(sizeInput.value) || 4));
+    const pct = `${((brushSize - 2) / 22) * 100}%`;
+    if (sizeFill) sizeFill.style.width = pct;
+    if (sizeThumb) sizeThumb.style.left = pct;
     if (sizeVal) sizeVal.textContent = `${brushSize}px`;
   });
 

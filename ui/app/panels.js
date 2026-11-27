@@ -355,7 +355,11 @@ function renderFilesTab() {
         <span>Proje Dosyaları (${visible.length})</span>
         <button type="button" class="sub-chip" id="btn-refresh-tree">Yenile</button>
       </div>
-      <input id="files-filter-input" class="field" placeholder="Dosya ara..." value="${escapeHtml(filter)}" />
+      <div class="custom-searchbar">
+        ${lucideIcon('search')}
+        <input id="files-filter-input" placeholder="Dosya ara..." value="${escapeHtml(filter)}" autocomplete="off" />
+        ${filter ? '<button type="button" class="custom-searchbar-clear" data-clear-input="files-filter-input">×</button>' : ''}
+      </div>
       <div class="file-tree-list">
         ${
           visible.length
@@ -619,7 +623,7 @@ function buildSettingsRows() {
       title: 'Tema Seçimi',
       keywords: 'tema dark light midnight forest nord obsidian oled görünüm renk',
       html: `
-        <div class="settings-row card">
+        <div class="settings-row">
           <div class="settings-row-info">
             <div class="settings-row-title">Arayüz Teması</div>
             <div class="card-desc">6 farklı koyu ve aydınlık palet arasından seçim yapın.</div>
@@ -642,8 +646,11 @@ function buildSettingsRows() {
       title: 'Vurgu Rengi (Accent)',
       keywords: 'vurgu rengi accent safir zümrüt menekşe kehribar gül renk',
       html: `
-        <div class="card">
-          <div class="card-title"><span>Vurgu Rengi</span></div>
+        <div class="settings-row-stack">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Vurgu Rengi</div>
+            <div class="card-desc">Aktif durumlar, kaydırıcılar ve görev ışığı için vurgu tonu.</div>
+          </div>
           <div class="swatch-grid">
             ${ACCENT_SWATCHES.map(
               (sw) => `
@@ -668,7 +675,7 @@ function buildSettingsRows() {
       title: 'Yazı Tipi (Font)',
       keywords: 'font yazı tipi inter system jetbrains mono serif tipografi',
       html: `
-        <div class="settings-row card">
+        <div class="settings-row">
           <div class="settings-row-info">
             <div class="settings-row-title">Yazı Tipi</div>
             <div class="card-desc">Sohbet ve panel okunabilirliği için tercih edilen font ailesi.</div>
@@ -691,14 +698,13 @@ function buildSettingsRows() {
       title: 'Görev Modu Animasyonu',
       keywords: 'animasyon görev modu task halo efekt görsel',
       html: `
-        <div class="settings-row card">
+        <div class="settings-row">
           <div class="settings-row-info">
             <div class="settings-row-title">Görev Modu Animasyonu</div>
             <div class="card-desc">Task modunda ajanlar çalışırken çevre ışığı ve geçiş efektlerini göster.</div>
           </div>
-          <label class="toggle-switch">
+          <label class="switch-toggle">
             <input type="checkbox" id="toggle-task-anim" ${store.taskAnim !== false ? 'checked' : ''} />
-            <span class="toggle-slider"></span>
           </label>
         </div>
       `,
@@ -711,20 +717,20 @@ function buildSettingsRows() {
       title: 'Proje Dili',
       keywords: 'dil language türkçe english deutsch français español genel',
       html: `
-        <div class="card">
-          <div class="card-title"><span>Proje Dili</span></div>
-          <div class="card-desc">Ajan yanıtları ve ortak proje kuralları için varsayılan dil.</div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <div style="flex:1;min-width:180px">
-              ${renderCustomSelect({
-                id: 'lang-select',
-                name: 'uiLang',
-                value: curLang,
-                options: LANG_OPTIONS,
-                placeholder: 'Dil seç...',
-              })}
-            </div>
-            <button type="button" class="btn btn-primary" id="btn-save-lang">Kaydet</button>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Proje Dili</div>
+            <div class="card-desc">Ajan yanıtları ve ortak proje kuralları için varsayılan dil.</div>
+          </div>
+          <div class="settings-row-ctrl">
+            ${renderCustomSelect({
+              id: 'lang-select',
+              name: 'uiLang',
+              value: curLang,
+              options: LANG_OPTIONS,
+              placeholder: 'Dil seç...',
+            })}
+            <button type="button" class="btn" id="btn-save-lang">Kaydet</button>
           </div>
         </div>
       `,
@@ -735,14 +741,13 @@ function buildSettingsRows() {
       title: 'Kısa Ajan Özetleri (2–3 Satır)',
       keywords: 'özet kısa concise ajan çıktı 2-3 satır okunabilirlik',
       html: `
-        <div class="settings-row card">
+        <div class="settings-row">
           <div class="settings-row-info">
             <div class="settings-row-title">Kısa Ajan Özetleri (2–3 Satır)</div>
             <div class="card-desc">Uzun ajan yanıtlarını sohbet akışında 2–3 satırlık özet kartlar halinde göster, detay için aç.</div>
           </div>
-          <label class="toggle-switch">
+          <label class="switch-toggle">
             <input type="checkbox" id="toggle-concise" ${store.conciseMode !== false ? 'checked' : ''} />
-            <span class="toggle-slider"></span>
           </label>
         </div>
       `,
@@ -753,14 +758,13 @@ function buildSettingsRows() {
       title: 'Sağ Panel Varsayılan Açık',
       keywords: 'sağ panel canlı hafıza kilitler varsayılan düzen layout',
       html: `
-        <div class="settings-row card">
+        <div class="settings-row">
           <div class="settings-row-info">
             <div class="settings-row-title">Sağ Paneli Açık Tut</div>
             <div class="card-desc">Canlı ajan akışı ve 5 saatlik limit sayacı panelini varsayılan olarak açık tut.</div>
           </div>
-          <label class="toggle-switch">
+          <label class="switch-toggle">
             <input type="checkbox" id="toggle-right-default" ${store.rightPanelOpen ? 'checked' : ''} />
-            <span class="toggle-slider"></span>
           </label>
         </div>
       `,
@@ -773,8 +777,11 @@ function buildSettingsRows() {
       title: 'Yüklü Yetenekler (Skills)',
       keywords: 'yetenek skill workspace talimat .agents/skills',
       html: `
-        <div class="card">
-          <div class="card-title"><span>Yüklü Yetenekler (${skills.length})</span></div>
+        <div class="settings-row-stack">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Yüklü Yetenekler (${skills.length})</div>
+            <div class="card-desc">.agents/skills klasöründe tanımlı ajan yetenekleri.</div>
+          </div>
           <div class="skills-list">
             ${
               skills.length
@@ -806,8 +813,11 @@ function buildSettingsRows() {
       title: 'Yeni Yetenek Oluştur',
       keywords: 'yeni yetenek ekle oluştur skill.md talimat',
       html: `
-        <div class="card">
-          <div class="card-title"><span>Yeni Yetenek Oluştur (.agents/skills)</span></div>
+        <div class="settings-row-stack">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Yeni Yetenek Oluştur (.agents/skills)</div>
+            <div class="card-desc">Ajanların okuyabileceği kalıcı talimat paketi ekleyin.</div>
+          </div>
           <input id="skill-name-input" class="field" maxlength="20" placeholder="Yetenek adı (1-20 karakter)..." />
           <input id="skill-desc-input" class="field" placeholder="Kısa açıklama..." />
           ${renderCustomSelect({
@@ -818,7 +828,7 @@ function buildSettingsRows() {
             placeholder: 'Hedef ajan...',
           })}
           <textarea id="skill-instructions-input" class="field" rows="3" placeholder="Talimatlar (SKILL.md içeriği)..."></textarea>
-          <button type="button" class="btn btn-primary" id="btn-create-skill">Yetenek Oluştur</button>
+          <div><button type="button" class="btn btn-primary" id="btn-create-skill">Yetenek Oluştur</button></div>
         </div>
       `,
     },
@@ -830,14 +840,13 @@ function buildSettingsRows() {
       title: 'Git Durumu & Remote',
       keywords: 'git github branch remote repo commit push bağlantı',
       html: `
-        <div class="card">
-          <div class="card-title">
-            <span>Git Durumu</span>
+        <div class="settings-row-stack">
+          <div class="row-between">
+            <div class="settings-row-info">
+              <div class="settings-row-title">Git Durumu</div>
+              <div class="card-desc">Remote: <code>${escapeHtml(git.remote || 'Tanımlı değil')}</code> · Değişiklikler: <strong>${git.changes ?? 0}</strong> · Auth: <strong>${git.hasGithubAuth ? escapeHtml(git.githubUser || git.authSource) : 'Bağlı değil'}</strong></div>
+            </div>
             <span class="agent-badge">${git.isRepo ? escapeHtml(git.branch || 'main') : 'Repo Yok'}</span>
-          </div>
-          <div class="card-desc">
-            Remote: <code>${escapeHtml(git.remote || 'Tanımlı değil')}</code><br />
-            Değişiklikler: <strong>${git.changes ?? 0}</strong> · GitHub Auth: <strong>${git.hasGithubAuth ? escapeHtml(git.githubUser || git.authSource) : 'Bağlı değil'}</strong>
           </div>
           ${
             Array.isArray(git.files) && git.files.length
@@ -857,14 +866,17 @@ function buildSettingsRows() {
       title: 'Commit, Push & GitHub Token',
       keywords: 'commit push github token auth çıkış',
       html: `
-        <div class="card">
-          <div class="card-title"><span>Commit & Push</span></div>
+        <div class="settings-row-stack">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Commit & Push</div>
+            <div class="card-desc">Değişiklikleri yerel commit veya GitHub push olarak gönderin.</div>
+          </div>
           <input id="git-commit-msg" class="field" placeholder="Commit mesajı..." />
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button type="button" class="btn" id="btn-git-commit">Commit</button>
             <button type="button" class="btn btn-primary" id="btn-git-push">Commit & Push</button>
           </div>
-          <div class="row-gap" style="margin-top:8px">
+          <div class="row-gap" style="margin-top:6px">
             <input id="git-token-input" type="password" class="field" placeholder="GitHub Token (opsiyonel)" />
             <input id="git-user-input" class="field" placeholder="GitHub Kullanıcı Adı" value="${escapeHtml(git.userName || '')}" />
             <div style="display:flex;gap:8px">
@@ -881,14 +893,18 @@ function buildSettingsRows() {
       title: 'Perplexity API Anahtarı',
       keywords: 'perplexity api key web araştırma sonar',
       html: `
-        <div class="card">
-          <div class="card-title">
-            <span>Perplexity Araştırma Anahtarı</span>
+        <div class="settings-row-stack">
+          <div class="row-between">
+            <div class="settings-row-info">
+              <div class="settings-row-title">Perplexity Araştırma Anahtarı</div>
+              <div class="card-desc">Ajanların canlı web araştırması isteklerini otomatik yanıtlamak için API anahtarı.</div>
+            </div>
             ${pplxKey?.configured ? `<span class="sub-chip active">${escapeHtml(pplxKey.masked)}</span>` : ''}
           </div>
-          <div class="card-desc">Ajanların canlı web araştırması isteklerini otomatik yanıtlamak için Perplexity API anahtarı.</div>
-          <input id="perplexity-key-input" type="password" class="field" placeholder="pplx-... (temizlemek için boş kaydet)" />
-          <button type="button" class="btn btn-primary" id="btn-save-perplexity">Perplexity Anahtarını Kaydet</button>
+          <div style="display:flex;gap:8px">
+            <input id="perplexity-key-input" type="password" class="field" placeholder="pplx-... (temizlemek için boş kaydet)" />
+            <button type="button" class="btn btn-primary" id="btn-save-perplexity">Kaydet</button>
+          </div>
         </div>
       `,
     },
@@ -900,15 +916,33 @@ function buildSettingsRows() {
       title: 'Klavye Kısayolları',
       keywords: 'kısayol klavye shortcut ctrl+f ctrl+, enter shift+enter esc',
       html: `
-        <div class="card">
-          <div class="card-title"><span>Klavye Kısayolları</span></div>
-          <div class="shortcut-list">
-            <div class="list-item"><span>Ayarlar penceresini aç / kapat</span><span class="kbd-hint">Ctrl+,</span></div>
-            <div class="list-item"><span>Hızlı arama (Sohbet, Proje, Ajan, Ayar)</span><span class="kbd-hint">Ctrl+F</span></div>
-            <div class="list-item"><span>Mesaj gönder</span><span class="kbd-hint">Enter</span></div>
-            <div class="list-item"><span>Mesajda yeni satır</span><span class="kbd-hint">Shift+Enter</span></div>
-            <div class="list-item"><span>Açık modal veya menüyü kapat</span><span class="kbd-hint">Esc</span></div>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Ayarlar penceresini aç / kapat</div>
+            <div class="card-desc">Herhangi bir ekrandan Ayarlar penceresini hızla açar.</div>
           </div>
+          <div class="settings-row-ctrl"><span class="kbd-pill">Ctrl+,</span></div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Hızlı arama menüsü</div>
+            <div class="card-desc">Sohbet, proje, ayar ve ajanları tahminli kutuyla anında bulur.</div>
+          </div>
+          <div class="settings-row-ctrl"><span class="kbd-pill">Ctrl+F</span></div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Mesaj gönder / Yeni satır</div>
+            <div class="card-desc">Metin kutusunda gönderim ve alt satır geçişleri.</div>
+          </div>
+          <div class="settings-row-ctrl"><span class="kbd-pill">Enter</span><span class="kbd-pill">Shift+Enter</span></div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-title">Açık pencereyi kapat</div>
+            <div class="card-desc">Ayarlar, arama veya açılır menüleri anında kapatır.</div>
+          </div>
+          <div class="settings-row-ctrl"><span class="kbd-pill">Esc</span></div>
         </div>
       `,
     },
@@ -927,8 +961,11 @@ function renderClaudeSettingsView() {
       )
     : allRows.filter((r) => r.cat === activeTab);
 
-  const railHtml = SETTINGS_CATEGORIES.map(
-    (c) => `
+  const activeCatObj = SETTINGS_CATEGORIES.find((c) => c.id === activeTab);
+  const railHtml = SETTINGS_CATEGORIES.map((c, idx) => {
+    const sep = idx === 1 || idx === 4 ? '<div class="settings-sep"></div>' : '';
+    return `
+      ${sep}
       <button
         type="button"
         class="settings-nav-item${!qNorm && activeTab === c.id ? ' active' : ''}"
@@ -937,37 +974,39 @@ function renderClaudeSettingsView() {
         ${lucideIcon(c.icon)}
         <span>${escapeHtml(c.label)}</span>
       </button>
-    `,
-  ).join('');
+    `;
+  }).join('');
 
+  const paneTitle = qNorm ? `Arama Sonuçları (${visibleRows.length})` : activeCatObj?.label || 'Ayarlar';
   const contentHtml = visibleRows.length
     ? visibleRows
         .map((r) =>
           qNorm
-            ? `<div class="settings-search-hit"><div class="settings-hit-cat">${escapeHtml(r.catLabel)}</div>${r.html}</div>`
+            ? `<div class="settings-search-hit"><div class="settings-hit-cat" style="font-size:11px;color:#8e8d87;margin-top:10px">${escapeHtml(r.catLabel)}</div>${r.html}</div>`
             : r.html,
         )
         .join('')
-    : '<div class="card"><div class="card-desc">Eşleşen ayar bulunamadı.</div></div>';
+    : '<div class="settings-row"><div class="settings-row-info"><div class="settings-row-title">Eşleşen ayar bulunamadı.</div></div></div>';
 
   return `
-    <div class="settings-layout">
+    <div class="settings-shell">
       <aside class="settings-rail">
-        <div class="settings-search-wrap">
+        <div class="custom-searchbar">
           ${lucideIcon('search')}
           <input
             id="settings-search-input"
-            class="settings-search-input"
-            placeholder="Ara..."
+            placeholder="Ara"
             value="${escapeHtml(query)}"
             autocomplete="off"
           />
+          ${query ? '<button type="button" class="custom-searchbar-clear" data-clear-input="settings-search-input">×</button>' : ''}
         </div>
         <nav class="settings-nav" aria-label="Ayar kategorileri">
           ${railHtml}
         </nav>
       </aside>
-      <div class="settings-content">
+      <div class="settings-pane">
+        <h3 class="settings-pane-title">${escapeHtml(paneTitle)}</h3>
         ${contentHtml}
       </div>
     </div>
